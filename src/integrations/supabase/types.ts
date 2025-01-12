@@ -9,7 +9,87 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      scheduled_segments: {
+        Row: {
+          created_at: string | null
+          duration_minutes: number
+          id: string
+          start_time: string
+          task_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_minutes: number
+          id?: string
+          start_time: string
+          task_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_minutes?: number
+          id?: string
+          start_time?: string
+          task_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_segments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          created_at: string | null
+          deadline: string
+          description: string | null
+          duration_minutes: number
+          id: string
+          repetition_end_date: string | null
+          repetition_type: Database["public"]["Enums"]["repetition_type"] | null
+          start_time: string
+          title: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deadline: string
+          description?: string | null
+          duration_minutes: number
+          id?: string
+          repetition_end_date?: string | null
+          repetition_type?:
+            | Database["public"]["Enums"]["repetition_type"]
+            | null
+          start_time: string
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deadline?: string
+          description?: string | null
+          duration_minutes?: number
+          id?: string
+          repetition_end_date?: string | null
+          repetition_type?:
+            | Database["public"]["Enums"]["repetition_type"]
+            | null
+          start_time?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +98,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      repetition_type: "none" | "daily" | "weekly" | "monthly" | "yearly"
     }
     CompositeTypes: {
       [_ in never]: never
