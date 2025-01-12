@@ -13,14 +13,18 @@ export const AuthForm = () => {
   useEffect(() => {
     // Check if user is already logged in
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
+        console.log("Auth state changed:", event, session); // Debug log
+        
         if (event === "SIGNED_IN" && session) {
+          console.log("User signed in, redirecting..."); // Debug log
           navigate("/");
         }
         if (event === "USER_UPDATED") {
           const checkSession = async () => {
             const { error } = await supabase.auth.getSession();
             if (error) {
+              console.error("Session error:", error); // Debug log
               setError(getErrorMessage(error));
             }
           };
