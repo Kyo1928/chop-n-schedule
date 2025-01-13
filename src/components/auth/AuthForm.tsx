@@ -71,6 +71,10 @@ export const AuthForm = () => {
               },
             }}
             providers={[]}
+            onError={(error) => {
+              console.error("Auth error:", error); // Debug log
+              setError(getErrorMessage(error));
+            }}
           />
         </div>
       </div>
@@ -90,23 +94,13 @@ const getErrorMessage = (error: AuthError): string => {
         if (error.message.includes("Email not confirmed")) {
           return "Please verify your email address before signing in.";
         }
-        break;
+        return "Invalid login attempt. Please check your credentials and try again.";
       case 422:
         return "Invalid email format. Please enter a valid email address.";
       default:
-        break;
+        return error.message;
     }
   }
   
-  switch (error.message) {
-    case "User not found":
-      return "No account found with these credentials. Please check your email or sign up.";
-    case "Invalid email":
-      return "Please enter a valid email address.";
-    case "Password is too short":
-      return "Password must be at least 6 characters long.";
-    default:
-      // If we don't have a specific message, return a user-friendly version of the error
-      return error.message || "An error occurred during authentication. Please try again.";
-  }
+  return "An unexpected error occurred. Please try again.";
 };
