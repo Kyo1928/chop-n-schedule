@@ -7,7 +7,10 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log("ProtectedRoute - Auth state:", { user, loading }); // Debug log
+    
     if (!loading && !user) {
+      console.log("No user found, redirecting to auth..."); // Debug log
       navigate("/auth");
     }
   }, [user, loading, navigate]);
@@ -15,7 +18,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">Loading...</div>
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
       </div>
     );
   }
