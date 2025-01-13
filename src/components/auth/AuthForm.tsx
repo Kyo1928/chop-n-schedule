@@ -20,7 +20,7 @@ export const AuthForm = () => {
           console.log("User signed in, redirecting..."); // Debug log
           navigate("/");
         }
-        if (event === "USER_UPDATED") {
+        if (event === "USER_UPDATED" || event === "PASSWORD_RECOVERY") {
           const checkSession = async () => {
             const { error } = await supabase.auth.getSession();
             if (error) {
@@ -79,15 +79,25 @@ export const AuthForm = () => {
   );
 };
 
-const getErrorMessage = (error: AuthError) => {
+const getErrorMessage = (error: AuthError): string => {
+  console.error("Authentication error:", error); // Debug log
+
+  // Handle specific error codes
+  if (error.message.includes("Invalid login credentials")) {
+    return "Invalid email or password. Please check your credentials and try again.";
+  }
+  
   switch (error.message) {
-    case "Invalid login credentials":
-      return "Invalid email or password. Please check your credentials and try again.";
     case "Email not confirmed":
       return "Please verify your email address before signing in.";
     case "User not found":
-      return "No user found with these credentials.";
+      return "No account found with these credentials. Please check your email or sign up.";
+    case "Invalid email":
+      return "Please enter a valid email address.";
+    case "Password is too short":
+      return "Password must be at least 6 characters long.";
     default:
-      return error.message;
+      // If we don't have a specific message, return a user-friendly version of the error
+      return error.message || "An error occurred during authentication. Please try again.";
   }
 };
