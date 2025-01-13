@@ -27,6 +27,10 @@ type TaskFormData = {
   description: string;
   duration_minutes: number;
   repetition_type: "none" | "daily" | "weekly" | "monthly" | "yearly";
+  start_time_hour: string;
+  start_time_minute: string;
+  deadline_hour: string;
+  deadline_minute: string;
 };
 
 export function TaskForm() {
@@ -41,6 +45,10 @@ export function TaskForm() {
       description: "",
       duration_minutes: 30,
       repetition_type: "none",
+      start_time_hour: "09",
+      start_time_minute: "00",
+      deadline_hour: "17",
+      deadline_minute: "00",
     },
   });
 
@@ -63,13 +71,29 @@ export function TaskForm() {
       return;
     }
 
+    // Set time on the dates
+    const startDateTime = new Date(startDate);
+    startDateTime.setHours(
+      parseInt(data.start_time_hour),
+      parseInt(data.start_time_minute)
+    );
+
+    const deadlineDateTime = new Date(deadline);
+    deadlineDateTime.setHours(
+      parseInt(data.deadline_hour),
+      parseInt(data.deadline_minute)
+    );
+
     try {
-      console.log("Creating task with user_id:", user.id); // Debug log
+      console.log("Creating task with user_id:", user.id);
       const { error } = await supabase.from("tasks").insert({
-        ...data,
+        title: data.title,
+        description: data.description,
         user_id: user.id,
-        start_time: startDate.toISOString(),
-        deadline: deadline.toISOString(),
+        start_time: startDateTime.toISOString(),
+        deadline: deadlineDateTime.toISOString(),
+        duration_minutes: data.duration_minutes,
+        repetition_type: data.repetition_type,
       });
 
       if (error) throw error;
@@ -132,6 +156,42 @@ export function TaskForm() {
               onSelect={setStartDate}
               className="rounded-md border"
             />
+            <div className="flex gap-2 mt-2">
+              <FormField
+                control={form.control}
+                name="start_time_hour"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="23"
+                        placeholder="HH"
+                        {...field}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="start_time_minute"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="59"
+                        placeholder="MM"
+                        {...field}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -142,6 +202,42 @@ export function TaskForm() {
               onSelect={setDeadline}
               className="rounded-md border"
             />
+            <div className="flex gap-2 mt-2">
+              <FormField
+                control={form.control}
+                name="deadline_hour"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="23"
+                        placeholder="HH"
+                        {...field}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="deadline_minute"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="59"
+                        placeholder="MM"
+                        {...field}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
         </div>
 
