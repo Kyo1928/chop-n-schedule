@@ -18,9 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type TaskFormData = {
   title: string;
@@ -33,6 +33,7 @@ export function TaskForm() {
   const [startDate, setStartDate] = useState<Date>();
   const [deadline, setDeadline] = useState<Date>();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const form = useForm<TaskFormData>({
     defaultValues: {
@@ -53,9 +54,20 @@ export function TaskForm() {
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create tasks",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      console.log("Creating task with user_id:", user.id); // Debug log
       const { error } = await supabase.from("tasks").insert({
         ...data,
+        user_id: user.id,
         start_time: startDate.toISOString(),
         deadline: deadline.toISOString(),
       });
