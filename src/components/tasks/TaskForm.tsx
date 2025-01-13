@@ -22,6 +22,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 
+type TaskFormProps = {
+  onTaskCreated?: () => void;
+};
+
 type TaskFormData = {
   title: string;
   description: string;
@@ -33,7 +37,7 @@ type TaskFormData = {
   deadline_minute: string;
 };
 
-export function TaskForm() {
+export function TaskForm({ onTaskCreated }: TaskFormProps) {
   const [startDate, setStartDate] = useState<Date>();
   const [deadline, setDeadline] = useState<Date>();
   const { toast } = useToast();
@@ -102,6 +106,9 @@ export function TaskForm() {
         title: "Success",
         description: "Task created successfully",
       });
+
+      // Call the onTaskCreated callback if provided
+      onTaskCreated?.();
 
       form.reset();
       setStartDate(undefined);
