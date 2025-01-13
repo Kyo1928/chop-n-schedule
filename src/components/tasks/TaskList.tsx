@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -10,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 
 type Task = {
   id: string;
@@ -21,31 +24,58 @@ type Task = {
   repetition_type: "none" | "daily" | "weekly" | "monthly" | "yearly";
 };
 
-export function TaskList() {
+type TaskListProps = {
+  refreshTrigger?: number;
+};
+
+export function TaskList({ refreshTrigger }: TaskListProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const { user } = useAuth();
+  const { toast } = useToast();
+
+  const fetchTasks = async () => {
+    if (!user) return;
+    
+    console.log("Fetching tasks for user:", user.id);
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .order("start_time", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching tasks:", error);
+      return;
+    }
+
+    console.log("Fetched tasks:", data);
+    setTasks(data || []);
+  };
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      if (!user) return;
-      
-      console.log("Fetching tasks for user:", user.id);
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("*")
-        .order("start_time", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching tasks:", error);
-        return;
-      }
-
-      console.log("Fetched tasks:", data);
-      setTasks(data || []);
-    };
-
     fetchTasks();
-  }, [user]);
+  }, [user, refreshTrigger]);
+
+  const handleDelete = async (taskId: string) => {
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", taskId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Success",
+      description: "Task deleted successfully",
+    });
+    fetchTasks();
+  };
 
   if (!tasks.length) {
     return <div className="text-center text-gray-500 my-8">No tasks found</div>;
@@ -62,6 +92,7 @@ export function TaskList() {
             <TableHead>Deadline</TableHead>
             <TableHead>Duration</TableHead>
             <TableHead>Repetition</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -77,6 +108,15 @@ export function TaskList() {
               </TableCell>
               <TableCell>{task.duration_minutes} minutes</TableCell>
               <TableCell>{task.repetition_type}</TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(task.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
