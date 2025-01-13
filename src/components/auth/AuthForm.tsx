@@ -4,14 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { AuthError } from "@supabase/supabase-js";
+import type { AuthError, AuthApiError } from "@supabase/supabase-js";
 
 export const AuthForm = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
-    // Check if user is already logged in
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event, session); // Debug log
@@ -82,14 +81,24 @@ export const AuthForm = () => {
 const getErrorMessage = (error: AuthError): string => {
   console.error("Authentication error:", error); // Debug log
 
-  // Handle specific error codes
-  if (error.message.includes("Invalid login credentials")) {
-    return "Invalid email or password. Please check your credentials and try again.";
+  if (error instanceof AuthApiError) {
+    switch (error.status) {
+      case 400:
+        if (error.message.includes("Invalid login credentials")) {
+          return "Invalid email or password. Please check your credentials and try again.";
+        }
+        if (error.message.includes("Email not confirmed")) {
+          return "Please verify your email address before signing in.";
+        }
+        break;
+      case 422:
+        return "Invalid email format. Please enter a valid email address.";
+      default:
+        break;
+    }
   }
   
   switch (error.message) {
-    case "Email not confirmed":
-      return "Please verify your email address before signing in.";
     case "User not found":
       return "No account found with these credentials. Please check your email or sign up.";
     case "Invalid email":
