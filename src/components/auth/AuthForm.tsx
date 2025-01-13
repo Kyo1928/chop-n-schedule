@@ -21,7 +21,7 @@ export const AuthForm = () => {
         }
         if (event === "USER_UPDATED" || event === "PASSWORD_RECOVERY") {
           const checkSession = async () => {
-            const { error } = await supabase.auth.getSession();
+            const { data, error } = await supabase.auth.getSession();
             if (error) {
               console.error("Session error:", error); // Debug log
               setError(getErrorMessage(error));
@@ -71,10 +71,6 @@ export const AuthForm = () => {
               },
             }}
             providers={[]}
-            onError={(error) => {
-              console.error("Auth error:", error); // Debug log
-              setError(getErrorMessage(error));
-            }}
           />
         </div>
       </div>
