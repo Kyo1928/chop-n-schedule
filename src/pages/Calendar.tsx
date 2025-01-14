@@ -1,16 +1,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { format, addDays, addWeeks, addMonths, addYears, isAfter } from "date-fns";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Task = {
   id: string;
@@ -30,194 +23,139 @@ type ScheduledSegment = {
   status: "on_time" | "missed_deadline";
 };
 
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const TIME_SLOT_HEIGHT = 60; // 60px per hour
+
 export default function CalendarPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [scheduledSegments, setScheduledSegments] = useState<ScheduledSegment[]>([]);
   const { user } = useAuth();
-
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  
   useEffect(() => {
     if (!user) return;
-    
-    const fetchTasks = async () => {
-      console.log("Fetching tasks for user:", user.id);
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("*")
-        .order("start_time", { ascending: true });
+    fetchScheduledSegments();
+  }, [user, currentMonth]);
 
-      if (error) {
-        console.error("Error fetching tasks:", error);
-        return;
-      }
+  const fetchScheduledSegments = async () => {
+    const { data: segments, error } = await supabase
+      .from("scheduled_segments")
+      .select(`
+        *,
+        tasks:tasks(title)
+      `)
+      .gte('start_time', startOfMonth(currentMonth).toISOString())
+      .lte('start_time', endOfMonth(currentMonth).toISOString())
+      .order('start_time', { ascending: true });
 
-      console.log("Fetched tasks:", data);
-      setTasks(data || []);
-      scheduleSegments(data || []);
-    };
-
-    fetchTasks();
-  }, [user]);
-
-  const generateRepeatedTasks = (task: Task): Task[] => {
-    const tasks: Task[] = [task];
-    const oneMonthFromNow = new Date();
-    oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
-    
-    if (task.repetition_type === "none") return tasks;
-
-    let currentDate = new Date(task.start_time);
-    let currentDeadline = new Date(task.deadline);
-
-    while (currentDate < oneMonthFromNow) {
-      let nextDate: Date;
-      let nextDeadline: Date;
-
-      switch (task.repetition_type) {
-        case "daily":
-          nextDate = addDays(currentDate, 1);
-          nextDeadline = addDays(currentDeadline, 1);
-          break;
-        case "weekly":
-          nextDate = addWeeks(currentDate, 1);
-          nextDeadline = addWeeks(currentDeadline, 1);
-          break;
-        case "monthly":
-          nextDate = addMonths(currentDate, 1);
-          nextDeadline = addMonths(currentDeadline, 1);
-          break;
-        case "yearly":
-          nextDate = addYears(currentDate, 1);
-          nextDeadline = addYears(currentDeadline, 1);
-          break;
-        default:
-          return tasks;
-      }
-
-      if (nextDate >= oneMonthFromNow) break;
-
-      tasks.push({
-        ...task,
-        start_time: nextDate.toISOString(),
-        deadline: nextDeadline.toISOString(),
-      });
-
-      currentDate = nextDate;
-      currentDeadline = nextDeadline;
+    if (error) {
+      console.error("Error fetching scheduled segments:", error);
+      return;
     }
 
-    return tasks;
+    const formattedSegments: ScheduledSegment[] = segments.map((segment: any) => ({
+      taskId: segment.task_id,
+      taskTitle: segment.tasks.title,
+      startTime: new Date(segment.start_time),
+      duration: segment.duration_minutes,
+      status: segment.status,
+    }));
+
+    setScheduledSegments(formattedSegments);
   };
 
-  const scheduleSegments = async (tasks: Task[]) => {
-    const segments: ScheduledSegment[] = [];
-    const allTasks: Task[] = [];
-    
-    // Generate repeated tasks
-    tasks.forEach(task => {
-      allTasks.push(...generateRepeatedTasks(task));
+  const getDaysInMonth = () => {
+    return eachDayOfInterval({
+      start: startOfMonth(currentMonth),
+      end: endOfMonth(currentMonth),
     });
+  };
+
+  const getSegmentStyle = (segment: ScheduledSegment) => {
+    const startHour = segment.startTime.getHours();
+    const startMinute = segment.startTime.getMinutes();
+    const durationInHours = segment.duration / 60;
     
-    // Sort tasks by deadline and start time
-    const sortedTasks = [...allTasks].sort((a, b) => {
-      const deadlineDiff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      if (deadlineDiff !== 0) return deadlineDiff;
-      return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
-    });
-
-    for (const task of sortedTasks) {
-      const startTime = new Date(task.start_time);
-      const deadline = new Date(task.deadline);
-      const duration = task.duration_minutes;
-
-      let scheduledStart = startTime;
-      let canSchedule = false;
-
-      while (scheduledStart <= deadline) {
-        const scheduledEnd = new Date(scheduledStart.getTime() + duration * 60000);
-        
-        const hasOverlap = segments.some(segment => {
-          const segmentEnd = new Date(segment.startTime.getTime() + segment.duration * 60000);
-          return (
-            (scheduledStart >= segment.startTime && scheduledStart < segmentEnd) ||
-            (scheduledEnd > segment.startTime && scheduledEnd <= segmentEnd)
-          );
-        });
-
-        if (!hasOverlap) {
-          canSchedule = true;
-          break;
-        }
-
-        scheduledStart = new Date(scheduledStart.getTime() + 30 * 60000);
-      }
-
-      if (canSchedule) {
-        const scheduledEnd = new Date(scheduledStart.getTime() + duration * 60000);
-        const status = isAfter(scheduledEnd, deadline) ? "missed_deadline" : "on_time";
-
-        // Save the scheduled segment to the database
-        const { error } = await supabase.from("scheduled_segments").insert({
-          task_id: task.id,
-          start_time: scheduledStart.toISOString(),
-          duration_minutes: duration,
-          status: status,
-        });
-
-        if (error) {
-          console.error("Error saving scheduled segment:", error);
-          continue;
-        }
-
-        segments.push({
-          taskId: task.id,
-          taskTitle: task.title,
-          startTime: scheduledStart,
-          duration: duration,
-          status: status,
-        });
-      }
-    }
-
-    setScheduledSegments(segments);
+    const top = (startHour + startMinute / 60) * TIME_SLOT_HEIGHT;
+    const height = durationInHours * TIME_SLOT_HEIGHT;
+    
+    return {
+      top: `${top}px`,
+      height: `${height}px`,
+      backgroundColor: segment.status === "missed_deadline" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+    };
   };
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Auto-Scheduled Calendar</h1>
+      <h1 className="text-2xl font-bold mb-6">Calendar Schedule</h1>
       <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Task</TableHead>
-              <TableHead>Start Time</TableHead>
-              <TableHead>End Time</TableHead>
-              <TableHead>Duration (minutes)</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {scheduledSegments.map((segment, index) => {
-              const endTime = new Date(
-                segment.startTime.getTime() + segment.duration * 60000
-              );
-              return (
-                <TableRow key={`${segment.taskId}-${index}`}>
-                  <TableCell>{segment.taskTitle}</TableCell>
-                  <TableCell>{format(segment.startTime, "PPp")}</TableCell>
-                  <TableCell>{format(endTime, "PPp")}</TableCell>
-                  <TableCell>{segment.duration}</TableCell>
-                  <TableCell>
-                    {segment.status === "missed_deadline" ? (
-                      <Badge variant="destructive">Misses Deadline!</Badge>
-                    ) : (
-                      <Badge variant="default">On Time</Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+        <ScrollArea className="h-[calc(100vh-12rem)] rounded-md" orientation="vertical">
+          <div className="relative">
+            {/* Time indicators */}
+            <div className="absolute left-0 top-0 w-20 bg-background z-10 border-r">
+              {HOURS.map((hour) => (
+                <div
+                  key={hour}
+                  className="border-b h-[60px] flex items-center justify-center text-sm"
+                >
+                  {format(new Date().setHours(hour, 0), "HH:mm")}
+                </div>
+              ))}
+            </div>
+            
+            {/* Scrollable calendar content */}
+            <ScrollArea className="ml-20" orientation="horizontal">
+              <div className="flex min-w-max">
+                {getDaysInMonth().map((day, index) => (
+                  <div
+                    key={index}
+                    className="flex-none w-[200px] border-r relative"
+                  >
+                    <div className="sticky top-0 z-10 bg-background border-b p-2 text-center">
+                      <div className="font-medium">
+                        {format(day, "EEEE")}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(day, "MMM d")}
+                      </div>
+                    </div>
+                    
+                    {/* Hour grid lines */}
+                    {HOURS.map((hour) => (
+                      <div
+                        key={hour}
+                        className="border-b h-[60px]"
+                      />
+                    ))}
+                    
+                    {/* Scheduled segments for this day */}
+                    {scheduledSegments
+                      .filter(segment => 
+                        format(segment.startTime, "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
+                      )
+                      .map((segment, segmentIndex) => (
+                        <div
+                          key={`${segment.taskId}-${segmentIndex}`}
+                          className="absolute w-[calc(100%-8px)] mx-1 rounded-md p-2 text-primary-foreground overflow-hidden"
+                          style={getSegmentStyle(segment)}
+                        >
+                          <div className="text-sm font-medium truncate">
+                            {segment.taskTitle}
+                          </div>
+                          <Badge 
+                            variant={segment.status === "missed_deadline" ? "destructive" : "secondary"}
+                            className="mt-1"
+                          >
+                            {segment.status === "missed_deadline" ? "Misses Deadline!" : "On Time"}
+                          </Badge>
+                        </div>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );
