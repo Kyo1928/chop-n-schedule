@@ -10,8 +10,10 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Tasks</h1>
+    <div className="container py-4 md:py-6 pt-16 md:pt-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>

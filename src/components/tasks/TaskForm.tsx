@@ -154,14 +154,14 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
           )}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="space-y-2">
             <FormLabel>Start Date</FormLabel>
             <Calendar
               mode="single"
               selected={startDate}
               onSelect={setStartDate}
-              className="rounded-md border"
+              className="flex justify-center rounded-md border"
             />
             <div className="flex gap-2 mt-2">
               <FormField
@@ -207,7 +207,7 @@ export function TaskForm({ onTaskCreated }: TaskFormProps) {
               mode="single"
               selected={deadline}
               onSelect={setDeadline}
-              className="rounded-md border"
+              className="flex justify-center rounded-md border"
             />
             <div className="flex gap-2 mt-2">
               <FormField
