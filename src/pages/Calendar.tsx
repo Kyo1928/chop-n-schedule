@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -89,7 +89,7 @@ export default function CalendarPage() {
     <div className="container mx-auto py-8">
       <h1 className="text-2xl font-bold mb-6">Calendar Schedule</h1>
       <div className="rounded-md border">
-        <ScrollArea className="h-[calc(100vh-12rem)] rounded-md" orientation="vertical">
+        <ScrollArea className="h-[calc(100vh-12rem)] rounded-md">
           <div className="relative">
             {/* Time indicators */}
             <div className="absolute left-0 top-0 w-20 bg-background z-10 border-r">
@@ -104,56 +104,58 @@ export default function CalendarPage() {
             </div>
             
             {/* Scrollable calendar content */}
-            <ScrollArea className="ml-20" orientation="horizontal">
-              <div className="flex min-w-max">
-                {getDaysInMonth().map((day, index) => (
-                  <div
-                    key={index}
-                    className="flex-none w-[200px] border-r relative"
-                  >
-                    <div className="sticky top-0 z-10 bg-background border-b p-2 text-center">
-                      <div className="font-medium">
-                        {format(day, "EEEE")}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(day, "MMM d")}
-                      </div>
-                    </div>
-                    
-                    {/* Hour grid lines */}
-                    {HOURS.map((hour) => (
-                      <div
-                        key={hour}
-                        className="border-b h-[60px]"
-                      />
-                    ))}
-                    
-                    {/* Scheduled segments for this day */}
-                    {scheduledSegments
-                      .filter(segment => 
-                        format(segment.startTime, "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
-                      )
-                      .map((segment, segmentIndex) => (
-                        <div
-                          key={`${segment.taskId}-${segmentIndex}`}
-                          className="absolute w-[calc(100%-8px)] mx-1 rounded-md p-2 text-primary-foreground overflow-hidden"
-                          style={getSegmentStyle(segment)}
-                        >
-                          <div className="text-sm font-medium truncate">
-                            {segment.taskTitle}
-                          </div>
-                          <Badge 
-                            variant={segment.status === "missed_deadline" ? "destructive" : "secondary"}
-                            className="mt-1"
-                          >
-                            {segment.status === "missed_deadline" ? "Misses Deadline!" : "On Time"}
-                          </Badge>
+            <div className="ml-20">
+              <ScrollArea className="w-full overflow-x-auto">
+                <div className="flex min-w-max">
+                  {getDaysInMonth().map((day, index) => (
+                    <div
+                      key={index}
+                      className="flex-none w-[200px] border-r relative"
+                    >
+                      <div className="sticky top-0 z-10 bg-background border-b p-2 text-center">
+                        <div className="font-medium">
+                          {format(day, "EEEE")}
                         </div>
+                        <div className="text-sm text-muted-foreground">
+                          {format(day, "MMM d")}
+                        </div>
+                      </div>
+                      
+                      {/* Hour grid lines */}
+                      {HOURS.map((hour) => (
+                        <div
+                          key={hour}
+                          className="border-b h-[60px]"
+                        />
                       ))}
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+                      
+                      {/* Scheduled segments for this day */}
+                      {scheduledSegments
+                        .filter(segment => 
+                          format(segment.startTime, "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
+                        )
+                        .map((segment, segmentIndex) => (
+                          <div
+                            key={`${segment.taskId}-${segmentIndex}`}
+                            className="absolute w-[calc(100%-8px)] mx-1 rounded-md p-2 text-primary-foreground overflow-hidden"
+                            style={getSegmentStyle(segment)}
+                          >
+                            <div className="text-sm font-medium truncate">
+                              {segment.taskTitle}
+                            </div>
+                            <Badge 
+                              variant={segment.status === "missed_deadline" ? "destructive" : "secondary"}
+                              className="mt-1"
+                            >
+                              {segment.status === "missed_deadline" ? "Misses Deadline!" : "On Time"}
+                            </Badge>
+                          </div>
+                        ))}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
           </div>
         </ScrollArea>
       </div>
