@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AuthError, AuthApiError } from "@supabase/supabase-js";
+import { useTheme } from "@/hooks/use-theme";
 
 export const AuthForm = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string>("");
+  const { theme } = useTheme();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -60,16 +62,9 @@ export const AuthForm = () => {
           <Auth
             supabaseClient={supabase}
             appearance={{
-              theme: ThemeSupa,
-              variables: {
-                default: {
-                  colors: {
-                    brand: 'hsl(var(--primary))',
-                    brandAccent: 'hsl(var(--primary))',
-                  },
-                },
-              },
+              theme: ThemeSupa
             }}
+            theme={theme === 'dark' ? 'dark' : ''}
             providers={[]}
           />
         </div>
