@@ -92,7 +92,7 @@ export default function CalendarPage() {
         <ScrollArea className="h-[calc(100vh-12rem)] rounded-md">
           <div className="relative">
             {/* Time indicators */}
-            <div className="absolute left-0 top-0 w-20 bg-background z-10 border-r">
+            <div className="absolute left-0 top-0 w-20 bg-background z-20 border-r">
               {HOURS.map((hour) => (
                 <div
                   key={hour}
@@ -105,30 +105,30 @@ export default function CalendarPage() {
             
             {/* Scrollable calendar content */}
             <div className="ml-20">
-              <ScrollArea className="w-full overflow-x-auto">
-                <div className="flex min-w-max">
-                  {getDaysInMonth().map((day, index) => (
-                    <div
-                      key={index}
-                      className="flex-none w-[200px] border-r relative"
-                    >
-                      <div className="sticky top-0 z-10 bg-background border-b p-2 text-center">
-                        <div className="font-medium">
-                          {format(day, "EEEE")}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {format(day, "MMM d")}
-                        </div>
+              <div className="flex min-w-max">
+                {getDaysInMonth().map((day, index) => (
+                  <div
+                    key={index}
+                    className="flex-none w-[200px] border-r relative"
+                  >
+                    <div className="sticky top-0 z-10 bg-background border-b p-2 text-center">
+                      <div className="font-medium">
+                        {format(day, "EEEE")}
                       </div>
-                      
-                      {/* Hour grid lines */}
+                      <div className="text-sm text-muted-foreground">
+                        {format(day, "MMM d")}
+                      </div>
+                    </div>
+                    
+                    {/* Hour grid lines */}
+                    <div className="relative">
                       {HOURS.map((hour) => (
                         <div
                           key={hour}
                           className="border-b h-[60px]"
                         />
                       ))}
-                      
+                    
                       {/* Scheduled segments for this day */}
                       {scheduledSegments
                         .filter(segment => 
@@ -152,9 +152,9 @@ export default function CalendarPage() {
                           </div>
                         ))}
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </ScrollArea>
