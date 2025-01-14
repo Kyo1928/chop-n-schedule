@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, Home, Menu } from "lucide-react"
+import { Moon, Sun, LogOut, Home, Menu, Calendar } from "lucide-react"
 import { useTheme } from "@/hooks/use-theme"
 import { supabase } from "@/integrations/supabase/client"
 import { useNavigate } from "react-router-dom"
@@ -75,6 +75,14 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <a href="/calendar">
+                        <Calendar />
+                        <span>Calendar</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                       {theme === "dark" ? <Sun /> : <Moon />}
                       <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
@@ -118,6 +126,14 @@ export function AppSidebar() {
                   <a href="/">
                     <Home />
                     <span>Home</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <a href="/calendar">
+                    <Calendar />
+                    <span>Calendar</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>

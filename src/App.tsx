@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import AuthPage from "./pages/Auth";
 import TasksPage from "./pages/Tasks";
+import CalendarPage from "./pages/Calendar";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import { ThemeProvider } from "./hooks/use-theme";
@@ -24,6 +25,14 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <TasksPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/calendar"
+                    element={
+                      <ProtectedRoute>
+                        <CalendarPage />
                       </ProtectedRoute>
                     }
                   />
