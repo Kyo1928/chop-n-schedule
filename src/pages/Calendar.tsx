@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, addDays, addWeeks, addMonths, addYears, isAfter } from "date-fns";
 import {
   Table,
   TableBody,
@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 type Task = {
   id: string;
@@ -18,6 +19,7 @@ type Task = {
   start_time: string;
   deadline: string;
   duration_minutes: number;
+  repetition_type: "none" | "daily" | "weekly" | "monthly" | "yearly";
 };
 
 type ScheduledSegment = {
@@ -25,6 +27,7 @@ type ScheduledSegment = {
   taskTitle: string;
   startTime: Date;
   duration: number;
+  status: "on_time" | "missed_deadline";
 };
 
 export default function CalendarPage() {
@@ -36,6 +39,7 @@ export default function CalendarPage() {
     if (!user) return;
     
     const fetchTasks = async () => {
+      console.log("Fetching tasks for user:", user.id);
       const { data, error } = await supabase
         .from("tasks")
         .select("*")
@@ -46,6 +50,7 @@ export default function CalendarPage() {
         return;
       }
 
+      console.log("Fetched tasks:", data);
       setTasks(data || []);
       scheduleSegments(data || []);
     };
@@ -53,14 +58,69 @@ export default function CalendarPage() {
     fetchTasks();
   }, [user]);
 
-  const scheduleSegments = (tasks: Task[]) => {
+  const generateRepeatedTasks = (task: Task): Task[] => {
+    const tasks: Task[] = [task];
+    const oneMonthFromNow = new Date();
+    oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
+    
+    if (task.repetition_type === "none") return tasks;
+
+    let currentDate = new Date(task.start_time);
+    let currentDeadline = new Date(task.deadline);
+
+    while (currentDate < oneMonthFromNow) {
+      let nextDate: Date;
+      let nextDeadline: Date;
+
+      switch (task.repetition_type) {
+        case "daily":
+          nextDate = addDays(currentDate, 1);
+          nextDeadline = addDays(currentDeadline, 1);
+          break;
+        case "weekly":
+          nextDate = addWeeks(currentDate, 1);
+          nextDeadline = addWeeks(currentDeadline, 1);
+          break;
+        case "monthly":
+          nextDate = addMonths(currentDate, 1);
+          nextDeadline = addMonths(currentDeadline, 1);
+          break;
+        case "yearly":
+          nextDate = addYears(currentDate, 1);
+          nextDeadline = addYears(currentDeadline, 1);
+          break;
+        default:
+          return tasks;
+      }
+
+      if (nextDate >= oneMonthFromNow) break;
+
+      tasks.push({
+        ...task,
+        start_time: nextDate.toISOString(),
+        deadline: nextDeadline.toISOString(),
+      });
+
+      currentDate = nextDate;
+      currentDeadline = nextDeadline;
+    }
+
+    return tasks;
+  };
+
+  const scheduleSegments = async (tasks: Task[]) => {
     const segments: ScheduledSegment[] = [];
-    const sortedTasks = [...tasks].sort((a, b) => {
-      // First by deadline
+    const allTasks: Task[] = [];
+    
+    // Generate repeated tasks
+    tasks.forEach(task => {
+      allTasks.push(...generateRepeatedTasks(task));
+    });
+    
+    // Sort tasks by deadline and start time
+    const sortedTasks = [...allTasks].sort((a, b) => {
       const deadlineDiff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
       if (deadlineDiff !== 0) return deadlineDiff;
-      
-      // Then by start time
       return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
     });
 
@@ -69,14 +129,12 @@ export default function CalendarPage() {
       const deadline = new Date(task.deadline);
       const duration = task.duration_minutes;
 
-      // Find available time slot
       let scheduledStart = startTime;
       let canSchedule = false;
 
       while (scheduledStart <= deadline) {
         const scheduledEnd = new Date(scheduledStart.getTime() + duration * 60000);
         
-        // Check if this slot overlaps with any existing segments
         const hasOverlap = segments.some(segment => {
           const segmentEnd = new Date(segment.startTime.getTime() + segment.duration * 60000);
           return (
@@ -85,21 +143,37 @@ export default function CalendarPage() {
           );
         });
 
-        if (!hasOverlap && scheduledEnd <= deadline) {
+        if (!hasOverlap) {
           canSchedule = true;
           break;
         }
 
-        // Try next 30-minute slot
         scheduledStart = new Date(scheduledStart.getTime() + 30 * 60000);
       }
 
       if (canSchedule) {
+        const scheduledEnd = new Date(scheduledStart.getTime() + duration * 60000);
+        const status = isAfter(scheduledEnd, deadline) ? "missed_deadline" : "on_time";
+
+        // Save the scheduled segment to the database
+        const { error } = await supabase.from("scheduled_segments").insert({
+          task_id: task.id,
+          start_time: scheduledStart.toISOString(),
+          duration_minutes: duration,
+          status: status,
+        });
+
+        if (error) {
+          console.error("Error saving scheduled segment:", error);
+          continue;
+        }
+
         segments.push({
           taskId: task.id,
           taskTitle: task.title,
           startTime: scheduledStart,
           duration: duration,
+          status: status,
         });
       }
     }
@@ -118,6 +192,7 @@ export default function CalendarPage() {
               <TableHead>Start Time</TableHead>
               <TableHead>End Time</TableHead>
               <TableHead>Duration (minutes)</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -131,6 +206,13 @@ export default function CalendarPage() {
                   <TableCell>{format(segment.startTime, "PPp")}</TableCell>
                   <TableCell>{format(endTime, "PPp")}</TableCell>
                   <TableCell>{segment.duration}</TableCell>
+                  <TableCell>
+                    {segment.status === "missed_deadline" ? (
+                      <Badge variant="destructive">Misses Deadline!</Badge>
+                    ) : (
+                      <Badge variant="default">On Time</Badge>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}

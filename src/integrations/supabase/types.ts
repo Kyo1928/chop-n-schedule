@@ -15,6 +15,7 @@ export type Database = {
           duration_minutes: number
           id: string
           start_time: string
+          status: Database["public"]["Enums"]["task_status"]
           task_id: string | null
           updated_at: string | null
         }
@@ -23,6 +24,7 @@ export type Database = {
           duration_minutes: number
           id?: string
           start_time: string
+          status?: Database["public"]["Enums"]["task_status"]
           task_id?: string | null
           updated_at?: string | null
         }
@@ -31,6 +33,7 @@ export type Database = {
           duration_minutes?: number
           id?: string
           start_time?: string
+          status?: Database["public"]["Enums"]["task_status"]
           task_id?: string | null
           updated_at?: string | null
         }
@@ -99,6 +102,7 @@ export type Database = {
     }
     Enums: {
       repetition_type: "none" | "daily" | "weekly" | "monthly" | "yearly"
+      task_status: "on_time" | "missed_deadline"
     }
     CompositeTypes: {
       [_ in never]: never
