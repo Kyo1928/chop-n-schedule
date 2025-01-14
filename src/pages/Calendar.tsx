@@ -86,10 +86,12 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Calendar Schedule</h1>
+    <div className="w-full px-8 pt-16 md:pt-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold mb-6">Calendar Schedule</h1>
+      </div>
       <div className="rounded-md border">
-        <ScrollArea className="h-[calc(100vh-12rem)] rounded-md">
+        <ScrollArea className="h-[calc(100vh-7rem)] rounded-md">
           <div className="relative">
             {/* Time indicators */}
             <div className="absolute left-0 top-0 w-20 bg-background z-20 border-r">

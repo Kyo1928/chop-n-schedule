@@ -37,122 +37,66 @@ export function AppSidebar() {
     }
   }
 
-  if (isMobile) {
-    return (
-      <>
+  return (
+    <>
+      {isMobile && (
         <Button
           variant="ghost"
           size="icon"
           className="fixed left-4 top-4 z-40 md:hidden"
           onClick={() => setOpenMobile(true)}
         >
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle Menu</span>
+        <Menu className="h-5 w-5" />
+        <span className="sr-only">Toggle Menu</span>
         </Button>
-        <Sidebar 
-          collapsible="icon" 
-          className="[--sidebar-width:150px]"
-          style={{
-            "--sidebar-width-icon": "3rem"
-          } as React.CSSProperties}
-        >
-          <SidebarHeader>
-            <div className="flex items-center justify-between">
-              <SidebarTrigger />
-            </div>
-          </SidebarHeader>
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <a href="/">
-                        <Home />
-                        <span>Home</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <a href="/calendar">
-                        <Calendar />
-                        <span>Calendar</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                      {theme === "dark" ? <Sun /> : <Moon />}
-                      <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton onClick={handleLogout}>
-                      <LogOut />
-                      <span>Log Out</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-        </Sidebar>
-      </>
-    )
-  }
-
-  return (
-    <Sidebar 
-      collapsible="icon" 
-      className="[--sidebar-width:150px]"
-      style={{
-        "--sidebar-width-icon": "3rem"
-      } as React.CSSProperties}
-    >
-      <SidebarHeader>
-        <div className="flex items-center justify-between">
-          <SidebarTrigger />
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <a href="/">
-                    <Home />
-                    <span>Home</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <a href="/calendar">
-                    <Calendar />
-                    <span>Calendar</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                  {theme === "dark" ? <Sun /> : <Moon />}
-                  <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleLogout}>
-                  <LogOut />
-                  <span>Log Out</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
+      )}
+      <Sidebar 
+        collapsible="icon" 
+        className="w-[15vw]"
+      >
+        <SidebarHeader>
+          <div className="flex items-center justify-between">
+            <SidebarTrigger />
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <a href="/">
+                      <Home />
+                      <span>Home</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <a href="/calendar">
+                      <Calendar />
+                      <span>Calendar</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                    {theme === "dark" ? <Sun /> : <Moon />}
+                    <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={handleLogout}>
+                    <LogOut />
+                    <span>Log Out</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      </Sidebar>
+    </>
   )
 }
