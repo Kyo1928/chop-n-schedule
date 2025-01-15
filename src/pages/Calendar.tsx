@@ -123,6 +123,22 @@ export default function CalendarPage() {
   const [lastPoint, setLastPoint] = useState({ x: 0, y: 0 });
   const animationFrameRef = useRef<number>();
 
+  useEffect(() => {
+    // Add global mouse event listeners
+    if (isDragging) {
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isDragging]);
+
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
     if (!scrollContainer) return;
@@ -141,7 +157,7 @@ export default function CalendarPage() {
     }
   };
 
-  const handleMouseUp = () => {
+  const handleGlobalMouseUp = () => {
     if (!isDragging) return;
     setIsDragging(false);
     
@@ -149,14 +165,29 @@ export default function CalendarPage() {
     if (!scrollContainer) return;
 
     let currentVelocity = { ...velocity };
+    const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+    
     const animate = () => {
       currentVelocity = {
         x: currentVelocity.x * 0.95,
         y: currentVelocity.y * 0.95,
       };
 
-      scrollContainer.scrollLeft -= currentVelocity.x;
-      scrollContainer.scrollTop -= currentVelocity.y;
+      const nextScrollLeft = scrollContainer.scrollLeft - currentVelocity.x;
+      const nextScrollTop = scrollContainer.scrollTop - currentVelocity.y;
+
+      // Only apply momentum within bounds
+      if (nextScrollLeft >= 0 && nextScrollLeft <= maxScroll) {
+        scrollContainer.scrollLeft = nextScrollLeft;
+      } else {
+        currentVelocity.x = 0;
+      }
+
+      if (nextScrollTop >= 0) {
+        scrollContainer.scrollTop = nextScrollTop;
+      } else {
+        currentVelocity.y = 0;
+      }
 
       if (Math.abs(currentVelocity.x) > 0.1 || Math.abs(currentVelocity.y) > 0.1) {
         animationFrameRef.current = requestAnimationFrame(animate);
@@ -166,7 +197,7 @@ export default function CalendarPage() {
     animationFrameRef.current = requestAnimationFrame(animate);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleGlobalMouseMove = (e: MouseEvent) => {
     const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
     if (!isDragging || !scrollContainer) return;
     
@@ -185,24 +216,20 @@ export default function CalendarPage() {
     
     setLastTime(currentTime);
     setLastPoint({ x: e.pageX, y: e.pageY });
-    
-    scrollContainer.scrollLeft = scrollLeft - deltaX;
-    scrollContainer.scrollTop = scrollTop - deltaY;
-  };
 
-  const handleMouseLeave = () => {
-    if (isDragging) {
-      handleMouseUp();
+    const nextScrollLeft = scrollLeft - deltaX;
+    const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+
+    // Apply scroll within bounds
+    if (nextScrollLeft >= 0 && nextScrollLeft <= maxScroll) {
+      scrollContainer.scrollLeft = nextScrollLeft;
+    }
+
+    const nextScrollTop = scrollTop - deltaY;
+    if (nextScrollTop >= 0) {
+      scrollContainer.scrollTop = nextScrollTop;
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, []);
 
   return (
     <div className="w-full px-2 md:px-8 pt-12 md:pt-6">
@@ -235,9 +262,6 @@ export default function CalendarPage() {
           <div 
             className="relative flex cursor-grab select-none active:cursor-grabbing"
             onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
           >
             <div className="sticky left-0 top-0 bottom-5 w-12 md:w-20 bg-background z-[2] border-r">
               <div className="h-[calc(4rem-1px)] flex items-start justify-center">
