@@ -62,9 +62,17 @@ export const AuthForm = () => {
           <Auth
             supabaseClient={supabase}
             appearance={{
-              theme: ThemeSupa
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: 'rgb(var(--primary))',
+                    brandAccent: 'rgb(var(--primary))',
+                  },
+                },
+              },
             }}
-            theme={theme === 'dark' ? 'dark' : ''}
+            theme={theme === 'dark' ? 'dark' : 'default'}
             providers={[]}
           />
         </div>
