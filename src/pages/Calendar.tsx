@@ -1,4 +1,4 @@
-import { useEffect, useState, CSSProperties } from "react";
+import { useEffect, useState, CSSProperties, useRef } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
@@ -112,6 +112,44 @@ export default function CalendarPage() {
     setTimeSlotHeight(prev => Math.max(prev - 15, 30));
   };
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!scrollContainerRef.current) return;
+    
+    setIsDragging(true);
+    setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
+    setStartY(e.pageY - scrollContainerRef.current.offsetTop);
+    setScrollLeft(scrollContainerRef.current.scrollLeft);
+    setScrollTop(scrollContainerRef.current.scrollTop);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging || !scrollContainerRef.current) return;
+    
+    e.preventDefault();
+    const x = e.pageX - scrollContainerRef.current.offsetLeft;
+    const y = e.pageY - scrollContainerRef.current.offsetTop;
+    const walkX = (x - startX) * 1.5;
+    const walkY = (y - startY) * 1.5;
+    
+    scrollContainerRef.current.scrollLeft = scrollLeft - walkX;
+    scrollContainerRef.current.scrollTop = scrollTop - walkY;
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
   return (
     <div className="w-full px-2 md:px-8 pt-16 md:pt-6">
       <div className="flex items-center justify-between mb-6">
@@ -136,8 +174,17 @@ export default function CalendarPage() {
         </div>
       </div>
       <div className="rounded-md border">
-        <ScrollArea className="h-[calc(100vh-7rem)] rounded-md">
-          <div className="relative flex">
+        <ScrollArea 
+          className="h-[calc(100vh-7rem)] rounded-md"
+          ref={scrollContainerRef}
+        >
+          <div 
+            className="relative flex cursor-grab active:cursor-grabbing"
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
             <div className="sticky left-0 top-0 bottom-5 w-12 md:w-20 bg-background z-[2] border-r">
               <div className="h-[calc(4rem-1px)] flex items-start justify-center">
                 <div className="font-bold text-sm md:text-base border-b text-center w-full py-1.5">Time</div>
