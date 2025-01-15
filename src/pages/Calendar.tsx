@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Task = {
   id: string;
@@ -23,18 +25,19 @@ type ScheduledSegment = {
   startTime: Date;
   duration: number;
   status: "on_time" | "missed_deadline";
+  task?: Task;
 };
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const MIN_TIME_SLOT_HEIGHT = 30; // Minimum height in pixels
-const MAX_TIME_SLOT_HEIGHT = 120; // Maximum height in pixels
-const ZOOM_STEP = 15; // Pixels to increase/decrease per zoom
+const MIN_TIME_SLOT_HEIGHT = 30;
+const MAX_TIME_SLOT_HEIGHT = 120;
+const ZOOM_STEP = 15;
 
 export default function CalendarPage() {
   const [scheduledSegments, setScheduledSegments] = useState<ScheduledSegment[]>([]);
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [timeSlotHeight, setTimeSlotHeight] = useState(60); // Make this stateful
+  const [timeSlotHeight, setTimeSlotHeight] = useState(60);
   
   useEffect(() => {
     if (!user) return;
@@ -46,7 +49,7 @@ export default function CalendarPage() {
       .from("scheduled_segments")
       .select(`
         *,
-        tasks:tasks(title)
+        tasks(*)
       `)
       .gte('start_time', startOfMonth(currentMonth).toISOString())
       .lte('start_time', endOfMonth(currentMonth).toISOString())
@@ -63,6 +66,7 @@ export default function CalendarPage() {
       startTime: new Date(segment.start_time),
       duration: segment.duration_minutes,
       status: segment.status,
+      task: segment.tasks,
     }));
 
     setScheduledSegments(formattedSegments);
@@ -98,6 +102,12 @@ export default function CalendarPage() {
     setTimeSlotHeight(prev => Math.max(prev - ZOOM_STEP, MIN_TIME_SLOT_HEIGHT));
   };
 
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  };
+
   return (
     <div className="w-full px-8 pt-16 md:pt-6">
       <div className="flex items-center justify-between mb-6">
@@ -124,12 +134,8 @@ export default function CalendarPage() {
       <div className="rounded-md border">
         <ScrollArea className="h-[calc(100vh-7rem)] rounded-md">
           <div className="relative flex">
-            {/* Time indicators */}
             <div className="sticky left-0 top-0 bottom-5 w-20 bg-background z-[2] border-r">
-              {/* Offset for the first hour */}
-              <div
-                className="h-[calc(4rem-1px)] flex items-start justify-center"
-              >
+              <div className="h-[calc(4rem-1px)] flex items-start justify-center">
                 <div className="font-bold text-m border-b text-center w-full py-1.5">Time</div>
               </div>
               {HOURS.map((hour) => (
@@ -148,7 +154,6 @@ export default function CalendarPage() {
               ))}
             </div>
             
-            {/* Scrollable calendar content */}
             <div className="relative">
               <div className="flex min-w-max">
                 {getDaysInMonth().map((day, index) => (
@@ -157,7 +162,6 @@ export default function CalendarPage() {
                     className="flex-none w-[200px] border-r relative"
                   >
                     <div className="sticky top-0 z-[1] bg-background border-b p-2 text-center h-16">
-                
                       <div className="font-medium">
                         {format(day, "EEEE")}
                       </div>
@@ -166,7 +170,6 @@ export default function CalendarPage() {
                       </div>
                     </div>
                     
-                    {/* Hour grid lines */}
                     <div className="relative">
                       {HOURS.map((hour) => (
                         <div
@@ -178,27 +181,58 @@ export default function CalendarPage() {
                         />
                       ))}
                     
-                      {/* Scheduled segments for this day */}
                       {scheduledSegments
                         .filter(segment => 
                           format(segment.startTime, "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
                         )
                         .map((segment, segmentIndex) => (
-                          <div
-                            key={`${segment.taskId}-${segmentIndex}`}
-                            className="absolute w-[calc(100%-8px)] mx-1 rounded-md p-2 text-primary-foreground overflow-hidden transition-all duration-200"
-                            style={getSegmentStyle(segment)}
-                          >
-                            <div className="text-sm font-medium truncate">
-                              {segment.taskTitle}
-                            </div>
-                            <Badge 
-                              variant={segment.status === "missed_deadline" ? "destructive" : "secondary"}
-                              className="mt-1"
-                            >
-                              {segment.status === "missed_deadline" ? "Misses Deadline!" : "On Time"}
-                            </Badge>
-                          </div>
+                          <HoverCard key={`${segment.taskId}-${segmentIndex}`}>
+                            <HoverCardTrigger asChild>
+                              <div
+                                className="absolute w-[calc(100%-8px)] mx-1 rounded-md p-2 text-primary-foreground overflow-hidden transition-all duration-200 cursor-pointer"
+                                style={getSegmentStyle(segment)}
+                              >
+                                <div className="text-sm font-medium truncate">
+                                  {segment.taskTitle}
+                                </div>
+                                <Badge 
+                                  variant={segment.status === "missed_deadline" ? "destructive" : "secondary"}
+                                  className="mt-1"
+                                >
+                                  {segment.status === "missed_deadline" ? "Misses Deadline!" : "On Time"}
+                                </Badge>
+                              </div>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-80">
+                              <Card>
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-lg">{segment.task?.title}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                  {segment.task?.description && (
+                                    <p className="text-sm text-muted-foreground">
+                                      {segment.task.description}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Clock className="h-4 w-4" />
+                                    <span>Duration: {formatDuration(segment.duration)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <CalendarIcon className="h-4 w-4" />
+                                    <span>
+                                      Deadline: {format(new Date(segment.task?.deadline || ''), "MMM d, yyyy HH:mm")}
+                                    </span>
+                                  </div>
+                                  {segment.task?.repetition_type !== 'none' && (
+                                    <Badge variant="outline" className="mt-2">
+                                      Repeats: {segment.task?.repetition_type}
+                                    </Badge>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            </HoverCardContent>
+                          </HoverCard>
                         ))}
                     </div>
                   </div>
