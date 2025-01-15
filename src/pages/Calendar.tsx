@@ -85,7 +85,7 @@ export default function CalendarPage() {
       const { error: deleteError } = await supabase
         .from('scheduled_segments')
         .delete()
-        .neq('id', null);
+        .not('id', 'is', null);
 
       if (deleteError) {
         console.error('Error deleting segments:', deleteError);
