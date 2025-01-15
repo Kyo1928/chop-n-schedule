@@ -13,7 +13,7 @@ import { TaskSegments } from "@/components/calendar/TaskSegments";
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MIN_TIME_SLOT_HEIGHT = 30;
 const MAX_TIME_SLOT_HEIGHT = 120;
-const MONTHS_TO_LOAD = 3; // Load 3 months at a time
+const MONTHS_TO_LOAD = 3;
 
 export default function CalendarPage() {
   const [scheduledSegments, setScheduledSegments] = useState([]);
@@ -21,6 +21,7 @@ export default function CalendarPage() {
   const [centerMonth, setCenterMonth] = useState(new Date());
   const [visibleMonths, setVisibleMonths] = useState([centerMonth]);
   const [timeSlotHeight, setTimeSlotHeight] = useState(60);
+  const [currentYear, setCurrentYear] = useState(format(new Date(), 'yyyy'));
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
@@ -82,6 +83,14 @@ export default function CalendarPage() {
     const scrollPosition = viewport.scrollLeft;
     const totalWidth = viewport.scrollWidth;
     const viewportWidth = viewport.clientWidth;
+    const visibleDays = getVisibleDays();
+    
+    // Update the current year based on the leftmost visible day
+    const leftmostVisibleIndex = Math.floor(scrollPosition / 200); // Assuming each day column is 200px wide
+    if (leftmostVisibleIndex >= 0 && leftmostVisibleIndex < visibleDays.length) {
+      const leftmostVisibleDay = visibleDays[leftmostVisibleIndex];
+      setCurrentYear(format(leftmostVisibleDay, 'yyyy'));
+    }
 
     // If we're near the end, load next month and remove first month
     if (scrollPosition > totalWidth - viewportWidth - 200) {
@@ -138,7 +147,10 @@ export default function CalendarPage() {
     <div className="w-full px-2 md:px-8 pt-12 md:pt-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">Calendar Schedule</h1>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-2xl font-bold">Calendar Schedule</h1>
+            <span className="text-lg text-muted-foreground">{currentYear}</span>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -193,11 +205,6 @@ export default function CalendarPage() {
                     data-is-today={isToday(day)}
                   >
                     <div className="sticky top-0 z-[1] bg-background border-b p-2 text-center h-16">
-                      {index === 0 && (
-                        <div className="text-sm text-muted-foreground mb-1">
-                          {format(day, "yyyy")}
-                        </div>
-                      )}
                       <div className="font-medium">
                         {format(day, "EEEE")}
                       </div>
