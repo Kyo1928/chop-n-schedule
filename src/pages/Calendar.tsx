@@ -3,7 +3,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ZoomIn, ZoomOut } from "lucide-react";
+import { ZoomIn, ZoomOut, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCalendarScroll } from "@/hooks/use-calendar-scroll";
@@ -19,6 +19,7 @@ export default function CalendarPage() {
   const [scheduledSegments, setScheduledSegments] = useState([]);
   const { user } = useAuth();
   const [centerMonth, setCenterMonth] = useState(new Date());
+  const [visibleMonths, setVisibleMonths] = useState([centerMonth]);
   const [timeSlotHeight, setTimeSlotHeight] = useState(60);
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -29,12 +30,13 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!user) return;
     fetchScheduledSegments();
-  }, [user, centerMonth]);
+  }, [user, visibleMonths]);
 
   const fetchScheduledSegments = async () => {
-    // Fetch segments for the visible months range
-    const startDate = startOfMonth(subMonths(centerMonth, 1));
-    const endDate = endOfMonth(addMonths(centerMonth, 1));
+    if (visibleMonths.length === 0) return;
+    
+    const startDate = startOfMonth(visibleMonths[0]);
+    const endDate = endOfMonth(visibleMonths[visibleMonths.length - 1]);
 
     const { data: segments, error } = await supabase
       .from("scheduled_segments")
@@ -64,22 +66,13 @@ export default function CalendarPage() {
   };
 
   const getVisibleDays = () => {
-    const prevMonth = eachDayOfInterval({
-      start: startOfMonth(subMonths(centerMonth, 1)),
-      end: endOfMonth(subMonths(centerMonth, 1)),
-    });
-    
-    const currentMonth = eachDayOfInterval({
-      start: startOfMonth(centerMonth),
-      end: endOfMonth(centerMonth),
-    });
-    
-    const nextMonth = eachDayOfInterval({
-      start: startOfMonth(addMonths(centerMonth, 1)),
-      end: endOfMonth(addMonths(centerMonth, 1)),
-    });
-
-    return [...prevMonth, ...currentMonth, ...nextMonth];
+    const allDays = visibleMonths.flatMap(month => 
+      eachDayOfInterval({
+        start: startOfMonth(month),
+        end: endOfMonth(month),
+      })
+    );
+    return allDays;
   };
 
   const handleScroll = () => {
@@ -90,13 +83,19 @@ export default function CalendarPage() {
     const totalWidth = viewport.scrollWidth;
     const viewportWidth = viewport.clientWidth;
 
-    // If we're near the end, load next month
+    // If we're near the end, load next month and remove first month
     if (scrollPosition > totalWidth - viewportWidth - 200) {
-      setCenterMonth(prev => addMonths(prev, 1));
+      setVisibleMonths(prev => {
+        const nextMonth = addMonths(prev[prev.length - 1], 1);
+        return [...prev.slice(1), nextMonth];
+      });
     }
-    // If we're near the start, load previous month
+    // If we're near the start, load previous month and remove last month
     else if (scrollPosition < 200) {
-      setCenterMonth(prev => subMonths(prev, 1));
+      setVisibleMonths(prev => {
+        const prevMonth = subMonths(prev[0], 1);
+        return [prevMonth, ...prev.slice(0, -1)];
+      });
     }
   };
 
@@ -108,10 +107,48 @@ export default function CalendarPage() {
     setTimeSlotHeight(prev => Math.max(prev - 15, MIN_TIME_SLOT_HEIGHT));
   };
 
+  const goToToday = () => {
+    const today = new Date();
+    setCenterMonth(today);
+    setVisibleMonths([
+      subMonths(today, 1),
+      today,
+      addMonths(today, 1)
+    ]);
+    
+    // Scroll to today's column after a short delay to ensure the DOM has updated
+    setTimeout(() => {
+      const todayColumn = document.querySelector('[data-is-today="true"]');
+      if (todayColumn) {
+        todayColumn.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+    }, 100);
+  };
+
+  // Initialize visible months on mount
+  useEffect(() => {
+    setVisibleMonths([
+      subMonths(centerMonth, 1),
+      centerMonth,
+      addMonths(centerMonth, 1)
+    ]);
+  }, []);
+
   return (
     <div className="w-full px-2 md:px-8 pt-12 md:pt-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Calendar Schedule</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Calendar Schedule</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToToday}
+            className="hidden md:flex"
+          >
+            <CalendarDays className="mr-2 h-4 w-4" />
+            Today
+          </Button>
+        </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -153,8 +190,14 @@ export default function CalendarPage() {
                     className={`flex-none w-[150px] md:w-[200px] border-r relative ${
                       isToday(day) ? 'bg-accent/20' : ''
                     }`}
+                    data-is-today={isToday(day)}
                   >
                     <div className="sticky top-0 z-[1] bg-background border-b p-2 text-center h-16">
+                      {index === 0 && (
+                        <div className="text-sm text-muted-foreground mb-1">
+                          {format(day, "yyyy")}
+                        </div>
+                      )}
                       <div className="font-medium">
                         {format(day, "EEEE")}
                       </div>
