@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { applyElasticity, calculateVelocity } from '@/utils/scrollUtils';
+import { calculateVelocity } from '@/utils/scrollUtils';
 
 interface ScrollState {
   isDragging: boolean;
@@ -68,32 +68,25 @@ export const useCalendarScroll = (scrollContainerRef: React.RefObject<HTMLDivEle
     if (!scrollContainer) return;
 
     let currentVelocity = { ...currentVelocityRef.current };
-    const maxScrollX = scrollContainer.scrollWidth - scrollContainer.clientWidth;
-    const maxScrollY = scrollContainer.scrollHeight - scrollContainer.clientHeight;
     
     const animate = () => {
       currentVelocity = {
-        x: currentVelocity.x * 0.95,
-        y: currentVelocity.y * 0.95,
+        x: currentVelocity.x * 0.9,
+        y: currentVelocity.y * 0.9,
       };
 
-      let nextScrollLeft = scrollContainer.scrollLeft - currentVelocity.x;
-      let nextScrollTop = scrollContainer.scrollTop - currentVelocity.y;
+      scrollContainer.scrollLeft = scrollContainer.scrollLeft + currentVelocity.x;
+      scrollContainer.scrollTop = scrollContainer.scrollTop + currentVelocity.y;
 
-      nextScrollLeft = applyElasticity(nextScrollLeft, 0, maxScrollX);
-      nextScrollTop = applyElasticity(nextScrollTop, 0, maxScrollY);
-
-      scrollContainer.scrollLeft = nextScrollLeft;
-      scrollContainer.scrollTop = nextScrollTop;
-
-      if (Math.abs(currentVelocity.x) > 0.1 || Math.abs(currentVelocity.y) > 0.1 ||
-          nextScrollLeft < 0 || nextScrollLeft > maxScrollX ||
-          nextScrollTop < 0 || nextScrollTop > maxScrollY) {
+      if (Math.abs(currentVelocity.x) > 0.01 || Math.abs(currentVelocity.y) > 0.01) {
         animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        console.log("Animation stopped - velocity too low");
       }
     };
 
     animationFrameRef.current = requestAnimationFrame(animate);
+    animate()
   };
 
   const handleGlobalMouseMove = (e: MouseEvent) => {
@@ -107,10 +100,13 @@ export const useCalendarScroll = (scrollContainerRef: React.RefObject<HTMLDivEle
     const currentTime = Date.now();
     const timeElapsed = currentTime - scrollState.lastTime;
     
-    currentVelocityRef.current = {
-      x: calculateVelocity(e.pageX, scrollState.lastPoint.x, timeElapsed),
-      y: calculateVelocity(e.pageY, scrollState.lastPoint.y, timeElapsed),
-    };
+    if (timeElapsed > 0) {
+      currentVelocityRef.current = {
+        x: calculateVelocity(e.pageX, scrollState.lastPoint.x, timeElapsed),
+        y: calculateVelocity(e.pageY, scrollState.lastPoint.y, timeElapsed),
+      };
+      console.log("Current velocity during move:", currentVelocityRef.current);
+    }
     
     setScrollState(prev => ({
       ...prev,
@@ -118,17 +114,8 @@ export const useCalendarScroll = (scrollContainerRef: React.RefObject<HTMLDivEle
       lastPoint: { x: e.pageX, y: e.pageY },
     }));
 
-    const maxScrollX = scrollContainer.scrollWidth - scrollContainer.clientWidth;
-    const maxScrollY = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-
-    let nextScrollLeft = scrollState.scrollLeft - deltaX;
-    let nextScrollTop = scrollState.scrollTop - deltaY;
-
-    nextScrollLeft = applyElasticity(nextScrollLeft, 0, maxScrollX);
-    nextScrollTop = applyElasticity(nextScrollTop, 0, maxScrollY);
-
-    scrollContainer.scrollLeft = nextScrollLeft;
-    scrollContainer.scrollTop = nextScrollTop;
+    scrollContainer.scrollLeft = scrollState.scrollLeft - deltaX;
+    scrollContainer.scrollTop = scrollState.scrollTop - deltaY;
   };
 
   return {
