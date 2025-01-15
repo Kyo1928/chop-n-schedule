@@ -13,6 +13,8 @@ import { TaskSegments } from "@/components/calendar/TaskSegments";
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MIN_TIME_SLOT_HEIGHT = 30;
 const MAX_TIME_SLOT_HEIGHT = 120;
+const DAY_WIDTH_MOBILE = 150;
+const DAY_WIDTH = 200;
 const MONTHS_TO_LOAD = 3;
 
 export default function CalendarPage() {
@@ -25,12 +27,14 @@ export default function CalendarPage() {
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const lastReclulatedVisibleDaysRef = useRef<number>(null);
   
   const { handleMouseDown, isDragging } = useCalendarScroll(scrollContainerRef);
 
   useEffect(() => {
     if (!user) return;
     fetchScheduledSegments();
+    lastReclulatedVisibleDaysRef.current = Date.now();
   }, [user, visibleMonths]);
 
   const fetchScheduledSegments = async () => {
@@ -77,6 +81,11 @@ export default function CalendarPage() {
   };
 
   const handleScroll = () => {
+    const lastCalculated = lastReclulatedVisibleDaysRef.current ?? 0;
+    if (Date.now() - lastCalculated < 400) {
+      return;
+    }
+    lastReclulatedVisibleDaysRef.current = Date.now();
     const viewport = scrollViewportRef.current;
     if (!viewport) return;
 
@@ -84,25 +93,50 @@ export default function CalendarPage() {
     const totalWidth = viewport.scrollWidth;
     const viewportWidth = viewport.clientWidth;
     const visibleDays = getVisibleDays();
-    
-    // Update the current year based on the leftmost visible day
-    const leftmostVisibleIndex = Math.floor(scrollPosition / 200); // Assuming each day column is 200px wide
+    const dayWidth = isMobile ? DAY_WIDTH_MOBILE : DAY_WIDTH;
+
+    // Calculate the current day index we're looking at
+    const leftmostVisibleIndex = Math.floor(scrollPosition / dayWidth);
     if (leftmostVisibleIndex >= 0 && leftmostVisibleIndex < visibleDays.length) {
       const leftmostVisibleDay = visibleDays[leftmostVisibleIndex];
       setCurrentYear(format(leftmostVisibleDay, 'yyyy'));
     }
 
     // If we're near the end, load next month and remove first month
-    if (scrollPosition > totalWidth - viewportWidth - 200) {
+    if (scrollPosition > totalWidth - viewportWidth - 1000) {
       setVisibleMonths(prev => {
         const nextMonth = addMonths(prev[prev.length - 1], 1);
+        const daysInFirstMonth = eachDayOfInterval({
+          start: startOfMonth(prev[0]),
+          end: endOfMonth(prev[0])
+        }).length;
+
+        // Adjust scroll position after state update
+        setTimeout(() => {
+          if (viewport) {
+            viewport.scrollLeft = scrollPosition - (daysInFirstMonth * dayWidth);
+          }
+        }, 0);
+
         return [...prev.slice(1), nextMonth];
       });
     }
     // If we're near the start, load previous month and remove last month
-    else if (scrollPosition < 200) {
+    else if (scrollPosition < 1000) {
       setVisibleMonths(prev => {
         const prevMonth = subMonths(prev[0], 1);
+        const daysInNewMonth = eachDayOfInterval({
+          start: startOfMonth(prevMonth),
+          end: endOfMonth(prevMonth)
+        }).length;
+
+        // Adjust scroll position after state update
+        setTimeout(() => {
+          if (viewport) {
+            viewport.scrollLeft = scrollPosition + (daysInNewMonth * dayWidth);
+          }
+        }, 0);
+
         return [prevMonth, ...prev.slice(0, -1)];
       });
     }
@@ -132,6 +166,7 @@ export default function CalendarPage() {
         todayColumn.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
       }
     }, 100);
+    handleScroll();
   };
 
   // Initialize visible months on mount
@@ -182,27 +217,29 @@ export default function CalendarPage() {
       </div>
       <div className="rounded-md border">
         <ScrollArea 
-          className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)] rounded-md overflow-hidden"
+          className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)] rounded-md"
           ref={scrollContainerRef}
           onScroll={handleScroll}
           scrollHideDelay={0}
+          scrollViewPortRef={scrollViewportRef}
         >
           <div 
             className={`relative flex ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
             onMouseDown={handleMouseDown}
-            ref={scrollViewportRef}
           >
             <TimeColumn hours={HOURS} timeSlotHeight={timeSlotHeight} />
             
-            <div className="relative min-w-[calc(100vw-3rem)] md:min-w-0">
+            <div className="relative min-w-4 md:min-w-0">
               <div className="flex">
                 {getVisibleDays().map((day, index) => (
                   <div
                     key={index}
-                    className={`flex-none w-[150px] md:w-[200px] border-r relative ${
-                      isToday(day) ? 'bg-accent/20' : ''
-                    }`}
+                    className={`flex-none w-[var(--day-width)] border-r relative ${
+                      isToday(day) ? 'bg-accent/20' : ''}`}
                     data-is-today={isToday(day)}
+                    style={{
+                      '--day-width': isMobile ? `${DAY_WIDTH_MOBILE}px` : `${DAY_WIDTH}px`
+                    } as CSSProperties}
                   >
                     <div className="sticky top-0 z-[1] bg-background border-b p-2 text-center h-16">
                       <div className="font-medium">

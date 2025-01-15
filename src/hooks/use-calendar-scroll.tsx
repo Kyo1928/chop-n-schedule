@@ -105,7 +105,6 @@ export const useCalendarScroll = (scrollContainerRef: React.RefObject<HTMLDivEle
         x: calculateVelocity(e.pageX, scrollState.lastPoint.x, timeElapsed),
         y: calculateVelocity(e.pageY, scrollState.lastPoint.y, timeElapsed),
       };
-      console.log("Current velocity during move:", currentVelocityRef.current);
     }
     
     setScrollState(prev => ({
