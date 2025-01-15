@@ -10,13 +10,15 @@ import { useCalendarScroll } from "@/hooks/use-calendar-scroll";
 import { TimeColumn } from "@/components/calendar/TimeColumn";
 import { TaskSegments } from "@/components/calendar/TaskSegments";
 import { useToast } from "@/hooks/use-toast";
+import { Database } from "@/integrations/supabase/types";
+
+type TaskStatus = Database["public"]["Enums"]["task_status"];
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MIN_TIME_SLOT_HEIGHT = 30;
 const MAX_TIME_SLOT_HEIGHT = 120;
 const DAY_WIDTH_MOBILE = 150;
 const DAY_WIDTH = 200;
-const MONTHS_TO_LOAD = 3;
 
 export default function CalendarPage() {
   const [scheduledSegments, setScheduledSegments] = useState([]);
@@ -99,7 +101,7 @@ export default function CalendarPage() {
         task_id: task.id,
         start_time: task.start_time,
         duration_minutes: task.duration_minutes,
-        status: new Date(task.deadline) < new Date() ? 'missed_deadline' : 'on_time'
+        status: (new Date(task.deadline) < new Date() ? 'missed_deadline' : 'on_time') as TaskStatus
       }));
 
       if (newSegments.length > 0) {
