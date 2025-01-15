@@ -80,22 +80,31 @@ export default function CalendarPage() {
     
     setIsRescheduling(true);
     try {
-      // First, delete all existing scheduled segments
+      console.log('Deleting existing segments...');
+      // Delete all existing scheduled segments using is not null instead of neq
       const { error: deleteError } = await supabase
         .from('scheduled_segments')
         .delete()
-        .neq('id', ''); // This deletes all segments the user has access to (due to RLS)
+        .filter('id', 'is not', null);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error('Error deleting segments:', deleteError);
+        throw deleteError;
+      }
 
+      console.log('Fetching tasks...');
       // Fetch all tasks
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
         .select('*')
         .order('deadline', { ascending: true });
 
-      if (tasksError) throw tasksError;
+      if (tasksError) {
+        console.error('Error fetching tasks:', tasksError);
+        throw tasksError;
+      }
 
+      console.log('Creating new segments...');
       // Create new segments for each task
       const newSegments = tasks.map(task => ({
         task_id: task.id,
@@ -109,7 +118,10 @@ export default function CalendarPage() {
           .from('scheduled_segments')
           .insert(newSegments);
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Error inserting segments:', insertError);
+          throw insertError;
+        }
       }
 
       // Refresh the segments display
