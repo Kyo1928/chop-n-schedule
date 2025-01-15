@@ -120,13 +120,14 @@ export default function CalendarPage() {
   const [scrollTop, setScrollTop] = useState(0);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!scrollContainerRef.current) return;
+    const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollContainer) return;
     
     setIsDragging(true);
-    setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
-    setStartY(e.pageY - scrollContainerRef.current.offsetTop);
-    setScrollLeft(scrollContainerRef.current.scrollLeft);
-    setScrollTop(scrollContainerRef.current.scrollTop);
+    setStartX(e.pageX - scrollContainer.getBoundingClientRect().left);
+    setStartY(e.pageY - scrollContainer.getBoundingClientRect().top);
+    setScrollLeft(scrollContainer.scrollLeft);
+    setScrollTop(scrollContainer.scrollTop);
   };
 
   const handleMouseUp = () => {
@@ -134,16 +135,17 @@ export default function CalendarPage() {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging || !scrollContainerRef.current) return;
+    const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!isDragging || !scrollContainer) return;
     
     e.preventDefault();
-    const x = e.pageX - scrollContainerRef.current.offsetLeft;
-    const y = e.pageY - scrollContainerRef.current.offsetTop;
-    const walkX = (x - startX) * 1.5;
-    const walkY = (y - startY) * 1.5;
+    const x = e.pageX - scrollContainer.getBoundingClientRect().left;
+    const y = e.pageY - scrollContainer.getBoundingClientRect().top;
+    const walkX = (x - startX);
+    const walkY = (y - startY);
     
-    scrollContainerRef.current.scrollLeft = scrollLeft - walkX;
-    scrollContainerRef.current.scrollTop = scrollTop - walkY;
+    scrollContainer.scrollLeft = scrollLeft - walkX;
+    scrollContainer.scrollTop = scrollTop - walkY;
   };
 
   const handleMouseLeave = () => {
@@ -179,7 +181,7 @@ export default function CalendarPage() {
           ref={scrollContainerRef}
         >
           <div 
-            className="relative flex cursor-grab active:cursor-grabbing"
+            className="relative flex cursor-grab select-none active:cursor-grabbing"
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
             onMouseMove={handleMouseMove}
