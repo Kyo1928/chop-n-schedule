@@ -118,6 +118,10 @@ export default function CalendarPage() {
   const [startY, setStartY] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
+  const [velocity, setVelocity] = useState({ x: 0, y: 0 });
+  const [lastTime, setLastTime] = useState(0);
+  const [lastPoint, setLastPoint] = useState({ x: 0, y: 0 });
+  const animationFrameRef = useRef<number>();
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
@@ -128,10 +132,38 @@ export default function CalendarPage() {
     setStartY(e.pageY - scrollContainer.getBoundingClientRect().top);
     setScrollLeft(scrollContainer.scrollLeft);
     setScrollTop(scrollContainer.scrollTop);
+    setLastTime(Date.now());
+    setLastPoint({ x: e.pageX, y: e.pageY });
+    setVelocity({ x: 0, y: 0 });
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
   };
 
   const handleMouseUp = () => {
+    if (!isDragging) return;
     setIsDragging(false);
+    
+    const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollContainer) return;
+
+    let currentVelocity = { ...velocity };
+    const animate = () => {
+      currentVelocity = {
+        x: currentVelocity.x * 0.95,
+        y: currentVelocity.y * 0.95,
+      };
+
+      scrollContainer.scrollLeft += currentVelocity.x;
+      scrollContainer.scrollTop += currentVelocity.y;
+
+      if (Math.abs(currentVelocity.x) > 0.1 || Math.abs(currentVelocity.y) > 0.1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -144,16 +176,38 @@ export default function CalendarPage() {
     const walkX = (x - startX);
     const walkY = (y - startY);
     
+    const currentTime = Date.now();
+    const timeElapsed = currentTime - lastTime;
+    
+    if (timeElapsed > 0) {
+      const velocityX = (e.pageX - lastPoint.x) / timeElapsed * 16;
+      const velocityY = (e.pageY - lastPoint.y) / timeElapsed * 16;
+      setVelocity({ x: velocityX, y: velocityY });
+    }
+    
+    setLastTime(currentTime);
+    setLastPoint({ x: e.pageX, y: e.pageY });
+    
     scrollContainer.scrollLeft = scrollLeft - walkX;
     scrollContainer.scrollTop = scrollTop - walkY;
   };
 
   const handleMouseLeave = () => {
-    setIsDragging(false);
+    if (isDragging) {
+      handleMouseUp();
+    }
   };
 
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
   return (
-    <div className="w-full px-2 md:px-8 pt-16 md:pt-6">
+    <div className="w-full px-2 md:px-8 pt-12 md:pt-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Calendar Schedule</h1>
         <div className="flex gap-2">
@@ -161,7 +215,7 @@ export default function CalendarPage() {
             variant="outline"
             size="icon"
             onClick={handleZoomOut}
-            disabled={timeSlotHeight <= 30}
+            disabled={timeSlotHeight <= MIN_TIME_SLOT_HEIGHT}
           >
             <ZoomOut className="h-4 w-4" />
           </Button>
@@ -169,7 +223,7 @@ export default function CalendarPage() {
             variant="outline"
             size="icon"
             onClick={handleZoomIn}
-            disabled={timeSlotHeight >= 120}
+            disabled={timeSlotHeight >= MAX_TIME_SLOT_HEIGHT}
           >
             <ZoomIn className="h-4 w-4" />
           </Button>
@@ -177,7 +231,7 @@ export default function CalendarPage() {
       </div>
       <div className="rounded-md border">
         <ScrollArea 
-          className="h-[calc(100vh-7rem)] rounded-md"
+          className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)] rounded-md overflow-hidden"
           ref={scrollContainerRef}
         >
           <div 
