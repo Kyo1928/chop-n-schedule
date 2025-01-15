@@ -81,11 +81,11 @@ export default function CalendarPage() {
     setIsRescheduling(true);
     try {
       console.log('Deleting existing segments...');
-      // Delete all existing scheduled segments using is not null instead of neq
+      // Delete all existing scheduled segments
       const { error: deleteError } = await supabase
         .from('scheduled_segments')
         .delete()
-        .filter('id', 'is not', null);
+        .neq('id', null);
 
       if (deleteError) {
         console.error('Error deleting segments:', deleteError);
