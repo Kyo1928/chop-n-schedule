@@ -3,12 +3,13 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ZoomIn, ZoomOut, CalendarDays } from "lucide-react";
+import { ZoomIn, ZoomOut, CalendarDays, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCalendarScroll } from "@/hooks/use-calendar-scroll";
 import { TimeColumn } from "@/components/calendar/TimeColumn";
 import { TaskSegments } from "@/components/calendar/TaskSegments";
+import { useToast } from "@/hooks/use-toast";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MIN_TIME_SLOT_HEIGHT = 30;
@@ -19,7 +20,9 @@ const MONTHS_TO_LOAD = 3;
 
 export default function CalendarPage() {
   const [scheduledSegments, setScheduledSegments] = useState([]);
+  const [isRescheduling, setIsRescheduling] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
   const [centerMonth, setCenterMonth] = useState(new Date());
   const [visibleMonths, setVisibleMonths] = useState([centerMonth]);
   const [timeSlotHeight, setTimeSlotHeight] = useState(60);
@@ -68,6 +71,62 @@ export default function CalendarPage() {
     }));
 
     setScheduledSegments(formattedSegments);
+  };
+
+  const handleReschedule = async () => {
+    if (!user) return;
+    
+    setIsRescheduling(true);
+    try {
+      // First, delete all existing scheduled segments
+      const { error: deleteError } = await supabase
+        .from('scheduled_segments')
+        .delete()
+        .neq('id', ''); // This deletes all segments the user has access to (due to RLS)
+
+      if (deleteError) throw deleteError;
+
+      // Fetch all tasks
+      const { data: tasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('deadline', { ascending: true });
+
+      if (tasksError) throw tasksError;
+
+      // Create new segments for each task
+      const newSegments = tasks.map(task => ({
+        task_id: task.id,
+        start_time: task.start_time,
+        duration_minutes: task.duration_minutes,
+        status: new Date(task.deadline) < new Date() ? 'missed_deadline' : 'on_time'
+      }));
+
+      if (newSegments.length > 0) {
+        const { error: insertError } = await supabase
+          .from('scheduled_segments')
+          .insert(newSegments);
+
+        if (insertError) throw insertError;
+      }
+
+      // Refresh the segments display
+      await fetchScheduledSegments();
+      
+      toast({
+        title: "Tasks rescheduled",
+        description: "Your tasks have been rescheduled successfully.",
+      });
+    } catch (error) {
+      console.error('Error rescheduling tasks:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to reschedule tasks. Please try again.",
+      });
+    } finally {
+      setIsRescheduling(false);
+    }
   };
 
   const getVisibleDays = () => {
@@ -197,6 +256,16 @@ export default function CalendarPage() {
           </Button>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReschedule}
+            disabled={isRescheduling}
+            className="hidden md:flex"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRescheduling ? 'animate-spin' : ''}`} />
+            Reschedule Tasks
+          </Button>
           <Button
             variant="outline"
             size="icon"
