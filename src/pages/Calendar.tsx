@@ -118,11 +118,10 @@ export default function CalendarPage() {
   const [startY, setStartY] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
-  const [velocity, setVelocity] = useState({ x: 0, y: 0 });
   const [lastTime, setLastTime] = useState(0);
   const [lastPoint, setLastPoint] = useState({ x: 0, y: 0 });
   const animationFrameRef = useRef<number>();
-  const elasticityFactor = 0.2;
+  const currentVelocityRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (isDragging) {
@@ -150,21 +149,10 @@ export default function CalendarPage() {
     setScrollTop(scrollContainer.scrollTop);
     setLastTime(Date.now());
     setLastPoint({ x: e.pageX, y: e.pageY });
-    setVelocity({ x: 0, y: 0 });
     
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
-  };
-
-  const applyElasticity = (current: number, min: number, max: number) => {
-    if (current < min) {
-      return min + (current - min) * elasticityFactor;
-    }
-    if (current > max) {
-      return max + (current - max) * elasticityFactor;
-    }
-    return current;
   };
 
   const handleGlobalMouseUp = () => {
@@ -174,35 +162,34 @@ export default function CalendarPage() {
     const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
     if (!scrollContainer) return;
 
-    let currentVelocity = { ...velocity };
-    const maxScrollX = scrollContainer.scrollWidth - scrollContainer.clientWidth;
-    const maxScrollY = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-    
-    const animate = () => {
-      currentVelocity = {
-        x: currentVelocity.x * 0.95,
-        y: currentVelocity.y * 0.95,
+    console.log("Initial velocity on mouse up:", currentVelocityRef.current);
+
+    const startAnimation = () => {
+      let currentVelocity = { ...currentVelocityRef.current };
+      console.log("Starting animation with velocity:", currentVelocity);
+      
+      const animate = () => {
+        currentVelocity = {
+          x: currentVelocity.x * 0.9,
+          y: currentVelocity.y * 0.9,
+        };
+
+        console.log("Current Velocity:", currentVelocity);
+
+        scrollContainer.scrollLeft = scrollContainer.scrollLeft + currentVelocity.x;
+        scrollContainer.scrollTop = scrollContainer.scrollTop + currentVelocity.y;
+
+        if (Math.abs(currentVelocity.x) > 0.01 || Math.abs(currentVelocity.y) > 0.01) {
+          console.log("Animating");
+          animationFrameRef.current = requestAnimationFrame(animate);
+        }
       };
 
-      let nextScrollLeft = scrollContainer.scrollLeft - currentVelocity.x;
-      let nextScrollTop = scrollContainer.scrollTop - currentVelocity.y;
-
-      // Apply elasticity at boundaries
-      nextScrollLeft = applyElasticity(nextScrollLeft, 0, maxScrollX);
-      nextScrollTop = applyElasticity(nextScrollTop, 0, maxScrollY);
-
-      scrollContainer.scrollLeft = nextScrollLeft;
-      scrollContainer.scrollTop = nextScrollTop;
-
-      // Continue animation if there's significant velocity or we're in elastic territory
-      if (Math.abs(currentVelocity.x) > 0.1 || Math.abs(currentVelocity.y) > 0.1 ||
-          nextScrollLeft < 0 || nextScrollLeft > maxScrollX ||
-          nextScrollTop < 0 || nextScrollTop > maxScrollY) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-      }
+      console.log("Requesting Animation Frame");
+      animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    animationFrameRef.current = requestAnimationFrame(animate);
+    requestAnimationFrame(startAnimation);
   };
 
   const handleGlobalMouseMove = (e: MouseEvent) => {
@@ -219,24 +206,15 @@ export default function CalendarPage() {
     if (timeElapsed > 0) {
       const velocityX = (lastPoint.x - e.pageX) / timeElapsed * 16;
       const velocityY = (lastPoint.y - e.pageY) / timeElapsed * 16;
-      setVelocity({ x: velocityX, y: velocityY });
+      console.log("Setting velocity:", { x: velocityX, y: velocityY });
+      currentVelocityRef.current = { x: velocityX, y: velocityY };
     }
     
     setLastTime(currentTime);
     setLastPoint({ x: e.pageX, y: e.pageY });
 
-    const maxScrollX = scrollContainer.scrollWidth - scrollContainer.clientWidth;
-    const maxScrollY = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-
-    let nextScrollLeft = scrollLeft - deltaX;
-    let nextScrollTop = scrollTop - deltaY;
-
-    // Apply elasticity at boundaries during drag
-    nextScrollLeft = applyElasticity(nextScrollLeft, 0, maxScrollX);
-    nextScrollTop = applyElasticity(nextScrollTop, 0, maxScrollY);
-
-    scrollContainer.scrollLeft = nextScrollLeft;
-    scrollContainer.scrollTop = nextScrollTop;
+    scrollContainer.scrollLeft = scrollLeft - deltaX;
+    scrollContainer.scrollTop = scrollTop - deltaY;
   };
 
   return (
