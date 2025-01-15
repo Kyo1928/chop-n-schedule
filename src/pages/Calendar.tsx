@@ -122,9 +122,9 @@ export default function CalendarPage() {
   const [lastTime, setLastTime] = useState(0);
   const [lastPoint, setLastPoint] = useState({ x: 0, y: 0 });
   const animationFrameRef = useRef<number>();
+  const elasticityFactor = 0.2;
 
   useEffect(() => {
-    // Add global mouse event listeners
     if (isDragging) {
       document.addEventListener('mousemove', handleGlobalMouseMove);
       document.addEventListener('mouseup', handleGlobalMouseUp);
@@ -157,6 +157,16 @@ export default function CalendarPage() {
     }
   };
 
+  const applyElasticity = (current: number, min: number, max: number) => {
+    if (current < min) {
+      return min + (current - min) * elasticityFactor;
+    }
+    if (current > max) {
+      return max + (current - max) * elasticityFactor;
+    }
+    return current;
+  };
+
   const handleGlobalMouseUp = () => {
     if (!isDragging) return;
     setIsDragging(false);
@@ -165,7 +175,8 @@ export default function CalendarPage() {
     if (!scrollContainer) return;
 
     let currentVelocity = { ...velocity };
-    const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+    const maxScrollX = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+    const maxScrollY = scrollContainer.scrollHeight - scrollContainer.clientHeight;
     
     const animate = () => {
       currentVelocity = {
@@ -173,23 +184,20 @@ export default function CalendarPage() {
         y: currentVelocity.y * 0.95,
       };
 
-      const nextScrollLeft = scrollContainer.scrollLeft - currentVelocity.x;
-      const nextScrollTop = scrollContainer.scrollTop - currentVelocity.y;
+      let nextScrollLeft = scrollContainer.scrollLeft - currentVelocity.x;
+      let nextScrollTop = scrollContainer.scrollTop - currentVelocity.y;
 
-      // Only apply momentum within bounds
-      if (nextScrollLeft >= 0 && nextScrollLeft <= maxScroll) {
-        scrollContainer.scrollLeft = nextScrollLeft;
-      } else {
-        currentVelocity.x = 0;
-      }
+      // Apply elasticity at boundaries
+      nextScrollLeft = applyElasticity(nextScrollLeft, 0, maxScrollX);
+      nextScrollTop = applyElasticity(nextScrollTop, 0, maxScrollY);
 
-      if (nextScrollTop >= 0) {
-        scrollContainer.scrollTop = nextScrollTop;
-      } else {
-        currentVelocity.y = 0;
-      }
+      scrollContainer.scrollLeft = nextScrollLeft;
+      scrollContainer.scrollTop = nextScrollTop;
 
-      if (Math.abs(currentVelocity.x) > 0.1 || Math.abs(currentVelocity.y) > 0.1) {
+      // Continue animation if there's significant velocity or we're in elastic territory
+      if (Math.abs(currentVelocity.x) > 0.1 || Math.abs(currentVelocity.y) > 0.1 ||
+          nextScrollLeft < 0 || nextScrollLeft > maxScrollX ||
+          nextScrollTop < 0 || nextScrollTop > maxScrollY) {
         animationFrameRef.current = requestAnimationFrame(animate);
       }
     };
@@ -217,18 +225,18 @@ export default function CalendarPage() {
     setLastTime(currentTime);
     setLastPoint({ x: e.pageX, y: e.pageY });
 
-    const nextScrollLeft = scrollLeft - deltaX;
-    const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+    const maxScrollX = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+    const maxScrollY = scrollContainer.scrollHeight - scrollContainer.clientHeight;
 
-    // Apply scroll within bounds
-    if (nextScrollLeft >= 0 && nextScrollLeft <= maxScroll) {
-      scrollContainer.scrollLeft = nextScrollLeft;
-    }
+    let nextScrollLeft = scrollLeft - deltaX;
+    let nextScrollTop = scrollTop - deltaY;
 
-    const nextScrollTop = scrollTop - deltaY;
-    if (nextScrollTop >= 0) {
-      scrollContainer.scrollTop = nextScrollTop;
-    }
+    // Apply elasticity at boundaries during drag
+    nextScrollLeft = applyElasticity(nextScrollLeft, 0, maxScrollX);
+    nextScrollTop = applyElasticity(nextScrollTop, 0, maxScrollY);
+
+    scrollContainer.scrollLeft = nextScrollLeft;
+    scrollContainer.scrollTop = nextScrollTop;
   };
 
   return (
