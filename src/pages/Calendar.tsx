@@ -1,7 +1,7 @@
 import { useEffect, useState, CSSProperties, useRef } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,31 +13,37 @@ import { TaskSegments } from "@/components/calendar/TaskSegments";
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MIN_TIME_SLOT_HEIGHT = 30;
 const MAX_TIME_SLOT_HEIGHT = 120;
+const MONTHS_TO_LOAD = 3; // Load 3 months at a time
 
 export default function CalendarPage() {
   const [scheduledSegments, setScheduledSegments] = useState([]);
   const { user } = useAuth();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [centerMonth, setCenterMonth] = useState(new Date());
   const [timeSlotHeight, setTimeSlotHeight] = useState(60);
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const { handleMouseDown, isDragging } = useCalendarScroll(scrollContainerRef);
-  
+
   useEffect(() => {
     if (!user) return;
     fetchScheduledSegments();
-  }, [user, currentMonth]);
+  }, [user, centerMonth]);
 
   const fetchScheduledSegments = async () => {
+    // Fetch segments for the visible months range
+    const startDate = startOfMonth(subMonths(centerMonth, 1));
+    const endDate = endOfMonth(addMonths(centerMonth, 1));
+
     const { data: segments, error } = await supabase
       .from("scheduled_segments")
       .select(`
         *,
         tasks(*)
       `)
-      .gte('start_time', startOfMonth(currentMonth).toISOString())
-      .lte('start_time', endOfMonth(currentMonth).toISOString())
+      .gte('start_time', startDate.toISOString())
+      .lte('start_time', endDate.toISOString())
       .order('start_time', { ascending: true });
 
     if (error) {
@@ -57,11 +63,41 @@ export default function CalendarPage() {
     setScheduledSegments(formattedSegments);
   };
 
-  const getDaysInMonth = () => {
-    return eachDayOfInterval({
-      start: startOfMonth(currentMonth),
-      end: endOfMonth(currentMonth),
+  const getVisibleDays = () => {
+    const prevMonth = eachDayOfInterval({
+      start: startOfMonth(subMonths(centerMonth, 1)),
+      end: endOfMonth(subMonths(centerMonth, 1)),
     });
+    
+    const currentMonth = eachDayOfInterval({
+      start: startOfMonth(centerMonth),
+      end: endOfMonth(centerMonth),
+    });
+    
+    const nextMonth = eachDayOfInterval({
+      start: startOfMonth(addMonths(centerMonth, 1)),
+      end: endOfMonth(addMonths(centerMonth, 1)),
+    });
+
+    return [...prevMonth, ...currentMonth, ...nextMonth];
+  };
+
+  const handleScroll = () => {
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return;
+
+    const scrollPosition = viewport.scrollLeft;
+    const totalWidth = viewport.scrollWidth;
+    const viewportWidth = viewport.clientWidth;
+
+    // If we're near the end, load next month
+    if (scrollPosition > totalWidth - viewportWidth - 200) {
+      setCenterMonth(prev => addMonths(prev, 1));
+    }
+    // If we're near the start, load previous month
+    else if (scrollPosition < 200) {
+      setCenterMonth(prev => subMonths(prev, 1));
+    }
   };
 
   const handleZoomIn = () => {
@@ -99,19 +135,24 @@ export default function CalendarPage() {
         <ScrollArea 
           className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)] rounded-md overflow-hidden"
           ref={scrollContainerRef}
+          onScroll={handleScroll}
+          scrollHideDelay={0}
         >
           <div 
             className={`relative flex ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
             onMouseDown={handleMouseDown}
+            ref={scrollViewportRef}
           >
             <TimeColumn hours={HOURS} timeSlotHeight={timeSlotHeight} />
             
             <div className="relative min-w-[calc(100vw-3rem)] md:min-w-0">
               <div className="flex">
-                {getDaysInMonth().map((day, index) => (
+                {getVisibleDays().map((day, index) => (
                   <div
                     key={index}
-                    className="flex-none w-[150px] md:w-[200px] border-r relative"
+                    className={`flex-none w-[150px] md:w-[200px] border-r relative ${
+                      isToday(day) ? 'bg-accent/20' : ''
+                    }`}
                   >
                     <div className="sticky top-0 z-[1] bg-background border-b p-2 text-center h-16">
                       <div className="font-medium">
