@@ -2,43 +2,27 @@ import { useEffect, useState, CSSProperties, useRef } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Clock, Calendar as CalendarIcon, ZoomIn, ZoomOut } from "lucide-react";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-type Task = {
-  id: string;
-  title: string;
-  description: string | null;
-  start_time: string;
-  deadline: string;
-  duration_minutes: number;
-  repetition_type: "none" | "daily" | "weekly" | "monthly" | "yearly";
-};
-
-type ScheduledSegment = {
-  taskId: string;
-  taskTitle: string;
-  startTime: Date;
-  duration: number;
-  status: "on_time" | "missed_deadline";
-  task?: Task;
-};
+import { useCalendarScroll } from "@/hooks/use-calendar-scroll";
+import { TimeColumn } from "@/components/calendar/TimeColumn";
+import { TaskSegments } from "@/components/calendar/TaskSegments";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MIN_TIME_SLOT_HEIGHT = 30;
 const MAX_TIME_SLOT_HEIGHT = 120;
-const ZOOM_STEP = 15;
 
 export default function CalendarPage() {
-  const [scheduledSegments, setScheduledSegments] = useState<ScheduledSegment[]>([]);
+  const [scheduledSegments, setScheduledSegments] = useState([]);
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeSlotHeight, setTimeSlotHeight] = useState(60);
   const isMobile = useIsMobile();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  const { handleMouseDown, isDragging } = useCalendarScroll(scrollContainerRef);
   
   useEffect(() => {
     if (!user) return;
@@ -61,7 +45,7 @@ export default function CalendarPage() {
       return;
     }
 
-    const formattedSegments: ScheduledSegment[] = segments.map((segment: any) => ({
+    const formattedSegments = segments.map((segment) => ({
       taskId: segment.task_id,
       taskTitle: segment.tasks.title,
       startTime: new Date(segment.start_time),
@@ -80,141 +64,12 @@ export default function CalendarPage() {
     });
   };
 
-  const getSegmentStyle = (segment: ScheduledSegment) => {
-    const startHour = segment.startTime.getHours();
-    const startMinute = segment.startTime.getMinutes();
-    const durationInHours = segment.duration / 60;
-    const backgroundColor = segment.status === "missed_deadline" 
-      ? "hsl(var(--destructive))" 
-      : "hsl(var(--primary))";
-    
-    const top = (startHour + startMinute / 60) * timeSlotHeight;
-    const height = durationInHours * timeSlotHeight;
-    
-    return {
-      top: `${top}px`,
-      height: `${height}px`,
-      backgroundColor,
-    };
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
-  };
-
   const handleZoomIn = () => {
-    setTimeSlotHeight(prev => Math.min(prev + 15, 120));
+    setTimeSlotHeight(prev => Math.min(prev + 15, MAX_TIME_SLOT_HEIGHT));
   };
 
   const handleZoomOut = () => {
-    setTimeSlotHeight(prev => Math.max(prev - 15, 30));
-  };
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [startY, setStartY] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [lastTime, setLastTime] = useState(0);
-  const [lastPoint, setLastPoint] = useState({ x: 0, y: 0 });
-  const animationFrameRef = useRef<number>();
-  const currentVelocityRef = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [isDragging]);
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-    if (!scrollContainer) return;
-    
-    setIsDragging(true);
-    setStartX(e.pageX);
-    setStartY(e.pageY);
-    setScrollLeft(scrollContainer.scrollLeft);
-    setScrollTop(scrollContainer.scrollTop);
-    setLastTime(Date.now());
-    setLastPoint({ x: e.pageX, y: e.pageY });
-    
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-  };
-
-  const handleGlobalMouseUp = () => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    
-    const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-    if (!scrollContainer) return;
-
-    console.log("Initial velocity on mouse up:", currentVelocityRef.current);
-
-    const startAnimation = () => {
-      let currentVelocity = { ...currentVelocityRef.current };
-      console.log("Starting animation with velocity:", currentVelocity);
-      
-      const animate = () => {
-        currentVelocity = {
-          x: currentVelocity.x * 0.9,
-          y: currentVelocity.y * 0.9,
-        };
-
-        console.log("Current Velocity:", currentVelocity);
-
-        scrollContainer.scrollLeft = scrollContainer.scrollLeft + currentVelocity.x;
-        scrollContainer.scrollTop = scrollContainer.scrollTop + currentVelocity.y;
-
-        if (Math.abs(currentVelocity.x) > 0.01 || Math.abs(currentVelocity.y) > 0.01) {
-          console.log("Animating");
-          animationFrameRef.current = requestAnimationFrame(animate);
-        }
-      };
-
-      console.log("Requesting Animation Frame");
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    requestAnimationFrame(startAnimation);
-  };
-
-  const handleGlobalMouseMove = (e: MouseEvent) => {
-    const scrollContainer = scrollContainerRef.current?.querySelector('[data-radix-scroll-area-viewport]');
-    if (!isDragging || !scrollContainer) return;
-    
-    e.preventDefault();
-    const deltaX = e.pageX - startX;
-    const deltaY = e.pageY - startY;
-    
-    const currentTime = Date.now();
-    const timeElapsed = currentTime - lastTime;
-    
-    if (timeElapsed > 0) {
-      const velocityX = (lastPoint.x - e.pageX) / timeElapsed * 16;
-      const velocityY = (lastPoint.y - e.pageY) / timeElapsed * 16;
-      console.log("Setting velocity:", { x: velocityX, y: velocityY });
-      currentVelocityRef.current = { x: velocityX, y: velocityY };
-    }
-    
-    setLastTime(currentTime);
-    setLastPoint({ x: e.pageX, y: e.pageY });
-
-    scrollContainer.scrollLeft = scrollLeft - deltaX;
-    scrollContainer.scrollTop = scrollTop - deltaY;
+    setTimeSlotHeight(prev => Math.max(prev - 15, MIN_TIME_SLOT_HEIGHT));
   };
 
   return (
@@ -246,28 +101,10 @@ export default function CalendarPage() {
           ref={scrollContainerRef}
         >
           <div 
-            className="relative flex cursor-grab select-none active:cursor-grabbing"
+            className={`relative flex ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
             onMouseDown={handleMouseDown}
           >
-            <div className="sticky left-0 top-0 bottom-5 w-12 md:w-20 bg-background z-[2] border-r">
-              <div className="h-[calc(4rem-1px)] flex items-start justify-center">
-                <div className="font-bold text-sm md:text-base border-b text-center w-full py-1.5">Time</div>
-              </div>
-              {HOURS.map((hour) => (
-                <div
-                  key={hour}
-                  className="h-[var(--time-slot-height)] flex items-start justify-center text-xs md:text-sm transition-[height] duration-200 relative"
-                  style={{
-                    '--time-slot-height': `${timeSlotHeight}px`
-                  } as CSSProperties}
-                >
-                  <div className="absolute -top-2.5 text-muted-foreground">
-                    {format(new Date().setHours(hour, 0), "HH:mm")}
-                  </div>
-                  <div className="absolute border-b w-3 right-0"/>
-                </div>
-              ))}
-            </div>
+            <TimeColumn hours={HOURS} timeSlotHeight={timeSlotHeight} />
             
             <div className="relative min-w-[calc(100vw-3rem)] md:min-w-0">
               <div className="flex">
@@ -289,71 +126,19 @@ export default function CalendarPage() {
                       {HOURS.map((hour) => (
                         <div
                           key={hour}
-                          className="border-b h-[var(--time-slot-height)] transition-[height] duration-200"
+                          className="border-b transition-[height] duration-200"
                           style={{
-                            '--time-slot-height': `${timeSlotHeight}px`
+                            '--time-slot-height': `${timeSlotHeight}px`,
+                            height: 'var(--time-slot-height)',
                           } as CSSProperties}
                         />
                       ))}
-                    
-                      {scheduledSegments
-                        .filter(segment => 
-                          format(segment.startTime, "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
-                        )
-                        .map((segment, segmentIndex) => (
-                          <HoverCard key={`${segment.taskId}-${segmentIndex}`}>
-                            <HoverCardTrigger asChild>
-                              <div
-                                className="absolute w-[calc(100%-8px)] mx-1 rounded-md p-2 text-primary-foreground overflow-hidden transition-all duration-200 cursor-pointer"
-                                style={getSegmentStyle(segment)}
-                              >
-                                <div className="text-sm font-medium truncate">
-                                  {segment.taskTitle}
-                                </div>
-                                <Badge 
-                                  variant={segment.status === "missed_deadline" ? "destructive" : "secondary"}
-                                  className="mt-1"
-                                >
-                                  {segment.status === "missed_deadline" ? "Misses Deadline!" : "On Time"}
-                                </Badge>
-                              </div>
-                            </HoverCardTrigger>
-                            <HoverCardContent 
-                              className="w-80" 
-                              style={{ 
-                                backgroundColor: segment.status === "missed_deadline" 
-                                  ? "hsl(var(--destructive))" 
-                                  : "hsl(var(--primary))",
-                                color: "hsl(var(--primary-foreground))",
-                                border: "none"
-                              }}
-                            >
-                              <div className="space-y-2">
-                                <h3 className="text-lg font-semibold">{segment.task?.title}</h3>
-                                {segment.task?.description && (
-                                  <p className="text-sm opacity-90">
-                                    {segment.task.description}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Clock className="h-4 w-4" />
-                                  <span>Duration: {formatDuration(segment.duration)}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <CalendarIcon className="h-4 w-4" />
-                                  <span>
-                                    Deadline: {format(new Date(segment.task?.deadline || ''), "MMM d, yyyy HH:mm")}
-                                  </span>
-                                </div>
-                                {segment.task?.repetition_type !== 'none' && (
-                                  <Badge variant="outline" className="mt-2 border-primary-foreground text-primary-foreground">
-                                    Repeats: {segment.task?.repetition_type}
-                                  </Badge>
-                                )}
-                              </div>
-                            </HoverCardContent>
-                          </HoverCard>
-                        ))}
+                      
+                      <TaskSegments 
+                        segments={scheduledSegments}
+                        day={day}
+                        timeSlotHeight={timeSlotHeight}
+                      />
                     </div>
                   </div>
                 ))}
