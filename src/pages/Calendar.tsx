@@ -128,8 +128,8 @@ export default function CalendarPage() {
     if (!scrollContainer) return;
     
     setIsDragging(true);
-    setStartX(e.pageX - scrollContainer.getBoundingClientRect().left);
-    setStartY(e.pageY - scrollContainer.getBoundingClientRect().top);
+    setStartX(e.pageX);
+    setStartY(e.pageY);
     setScrollLeft(scrollContainer.scrollLeft);
     setScrollTop(scrollContainer.scrollTop);
     setLastTime(Date.now());
@@ -155,8 +155,8 @@ export default function CalendarPage() {
         y: currentVelocity.y * 0.95,
       };
 
-      scrollContainer.scrollLeft += currentVelocity.x;
-      scrollContainer.scrollTop += currentVelocity.y;
+      scrollContainer.scrollLeft -= currentVelocity.x;
+      scrollContainer.scrollTop -= currentVelocity.y;
 
       if (Math.abs(currentVelocity.x) > 0.1 || Math.abs(currentVelocity.y) > 0.1) {
         animationFrameRef.current = requestAnimationFrame(animate);
@@ -171,25 +171,23 @@ export default function CalendarPage() {
     if (!isDragging || !scrollContainer) return;
     
     e.preventDefault();
-    const x = e.pageX - scrollContainer.getBoundingClientRect().left;
-    const y = e.pageY - scrollContainer.getBoundingClientRect().top;
-    const walkX = (x - startX);
-    const walkY = (y - startY);
+    const deltaX = e.pageX - startX;
+    const deltaY = e.pageY - startY;
     
     const currentTime = Date.now();
     const timeElapsed = currentTime - lastTime;
     
     if (timeElapsed > 0) {
-      const velocityX = (e.pageX - lastPoint.x) / timeElapsed * 16;
-      const velocityY = (e.pageY - lastPoint.y) / timeElapsed * 16;
+      const velocityX = (lastPoint.x - e.pageX) / timeElapsed * 16;
+      const velocityY = (lastPoint.y - e.pageY) / timeElapsed * 16;
       setVelocity({ x: velocityX, y: velocityY });
     }
     
     setLastTime(currentTime);
     setLastPoint({ x: e.pageX, y: e.pageY });
     
-    scrollContainer.scrollLeft = scrollLeft - walkX;
-    scrollContainer.scrollTop = scrollTop - walkY;
+    scrollContainer.scrollLeft = scrollLeft - deltaX;
+    scrollContainer.scrollTop = scrollTop - deltaY;
   };
 
   const handleMouseLeave = () => {
