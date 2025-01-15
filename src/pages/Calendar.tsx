@@ -4,8 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Minus, Clock, Calendar as CalendarIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Clock, Calendar as CalendarIcon } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -83,6 +82,9 @@ export default function CalendarPage() {
     const startHour = segment.startTime.getHours();
     const startMinute = segment.startTime.getMinutes();
     const durationInHours = segment.duration / 60;
+    const backgroundColor = segment.status === "missed_deadline" 
+      ? "hsl(var(--destructive))" 
+      : "hsl(var(--primary))";
     
     const top = (startHour + startMinute / 60) * timeSlotHeight;
     const height = durationInHours * timeSlotHeight;
@@ -90,16 +92,8 @@ export default function CalendarPage() {
     return {
       top: `${top}px`,
       height: `${height}px`,
-      backgroundColor: segment.status === "missed_deadline" ? "hsl(var(--destructive))" : "hsl(var(--primary))",
+      backgroundColor,
     };
-  };
-
-  const handleZoomIn = () => {
-    setTimeSlotHeight(prev => Math.min(prev + ZOOM_STEP, MAX_TIME_SLOT_HEIGHT));
-  };
-
-  const handleZoomOut = () => {
-    setTimeSlotHeight(prev => Math.max(prev - ZOOM_STEP, MIN_TIME_SLOT_HEIGHT));
   };
 
   const formatDuration = (minutes: number) => {
@@ -112,24 +106,6 @@ export default function CalendarPage() {
     <div className="w-full px-8 pt-16 md:pt-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Calendar Schedule</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleZoomOut}
-            disabled={timeSlotHeight <= MIN_TIME_SLOT_HEIGHT}
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleZoomIn}
-            disabled={timeSlotHeight >= MAX_TIME_SLOT_HEIGHT}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
       <div className="rounded-md border">
         <ScrollArea className="h-[calc(100vh-7rem)] rounded-md">
@@ -203,34 +179,39 @@ export default function CalendarPage() {
                                 </Badge>
                               </div>
                             </HoverCardTrigger>
-                            <HoverCardContent className="w-80">
-                              <Card>
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-lg">{segment.task?.title}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                  {segment.task?.description && (
-                                    <p className="text-sm text-muted-foreground">
-                                      {segment.task.description}
-                                    </p>
-                                  )}
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Clock className="h-4 w-4" />
-                                    <span>Duration: {formatDuration(segment.duration)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <CalendarIcon className="h-4 w-4" />
-                                    <span>
-                                      Deadline: {format(new Date(segment.task?.deadline || ''), "MMM d, yyyy HH:mm")}
-                                    </span>
-                                  </div>
-                                  {segment.task?.repetition_type !== 'none' && (
-                                    <Badge variant="outline" className="mt-2">
-                                      Repeats: {segment.task?.repetition_type}
-                                    </Badge>
-                                  )}
-                                </CardContent>
-                              </Card>
+                            <HoverCardContent 
+                              className="w-80" 
+                              style={{ 
+                                backgroundColor: segment.status === "missed_deadline" 
+                                  ? "hsl(var(--destructive))" 
+                                  : "hsl(var(--primary))",
+                                color: "hsl(var(--primary-foreground))",
+                                border: "none"
+                              }}
+                            >
+                              <div className="space-y-2">
+                                <h3 className="text-lg font-semibold">{segment.task?.title}</h3>
+                                {segment.task?.description && (
+                                  <p className="text-sm opacity-90">
+                                    {segment.task.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Clock className="h-4 w-4" />
+                                  <span>Duration: {formatDuration(segment.duration)}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                  <CalendarIcon className="h-4 w-4" />
+                                  <span>
+                                    Deadline: {format(new Date(segment.task?.deadline || ''), "MMM d, yyyy HH:mm")}
+                                  </span>
+                                </div>
+                                {segment.task?.repetition_type !== 'none' && (
+                                  <Badge variant="outline" className="mt-2 border-primary-foreground text-primary-foreground">
+                                    Repeats: {segment.task?.repetition_type}
+                                  </Badge>
+                                )}
+                              </div>
                             </HoverCardContent>
                           </HoverCard>
                         ))}
