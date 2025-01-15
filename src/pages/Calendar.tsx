@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Clock, Calendar as CalendarIcon, ZoomIn, ZoomOut } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Task = {
   id: string;
@@ -37,6 +38,7 @@ export default function CalendarPage() {
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeSlotHeight, setTimeSlotHeight] = useState(60);
+  const isMobile = useIsMobile();
   
   useEffect(() => {
     if (!user) return;
@@ -102,22 +104,48 @@ export default function CalendarPage() {
     return `${hours}h ${remainingMinutes}m`;
   };
 
+  const handleZoomIn = () => {
+    setTimeSlotHeight(prev => Math.min(prev + 15, 120));
+  };
+
+  const handleZoomOut = () => {
+    setTimeSlotHeight(prev => Math.max(prev - 15, 30));
+  };
+
   return (
-    <div className="w-full px-8 pt-16 md:pt-6">
+    <div className="w-full px-2 md:px-8 pt-16 md:pt-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Calendar Schedule</h1>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleZoomOut}
+            disabled={timeSlotHeight <= 30}
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleZoomIn}
+            disabled={timeSlotHeight >= 120}
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       <div className="rounded-md border">
         <ScrollArea className="h-[calc(100vh-7rem)] rounded-md">
           <div className="relative flex">
-            <div className="sticky left-0 top-0 bottom-5 w-20 bg-background z-[2] border-r">
+            <div className="sticky left-0 top-0 bottom-5 w-12 md:w-20 bg-background z-[2] border-r">
               <div className="h-[calc(4rem-1px)] flex items-start justify-center">
-                <div className="font-bold text-m border-b text-center w-full py-1.5">Time</div>
+                <div className="font-bold text-sm md:text-base border-b text-center w-full py-1.5">Time</div>
               </div>
               {HOURS.map((hour) => (
                 <div
                   key={hour}
-                  className="h-[var(--time-slot-height)] flex items-start justify-center text-sm transition-[height] duration-200 relative"
+                  className="h-[var(--time-slot-height)] flex items-start justify-center text-xs md:text-sm transition-[height] duration-200 relative"
                   style={{
                     '--time-slot-height': `${timeSlotHeight}px`
                   } as CSSProperties}
@@ -130,12 +158,12 @@ export default function CalendarPage() {
               ))}
             </div>
             
-            <div className="relative">
-              <div className="flex min-w-max">
+            <div className="relative min-w-[calc(100vw-3rem)] md:min-w-0">
+              <div className="flex">
                 {getDaysInMonth().map((day, index) => (
                   <div
                     key={index}
-                    className="flex-none w-[200px] border-r relative"
+                    className="flex-none w-[150px] md:w-[200px] border-r relative"
                   >
                     <div className="sticky top-0 z-[1] bg-background border-b p-2 text-center h-16">
                       <div className="font-medium">
