@@ -198,6 +198,14 @@ export default function CalendarPage() {
       centerMonth,
       addMonths(centerMonth, 1)
     ]);
+
+    // Auto-scroll to today after initial render
+    setTimeout(() => {
+      const todayColumn = document.querySelector('[data-is-today="true"]');
+      if (todayColumn) {
+        todayColumn.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+    }, 100);
   }, []);
 
   return (

@@ -16,11 +16,23 @@ function findAvailableSlots(
   endTime: Date,
   existingSegments: TimeSlot[],
   duration: number,
-  taskStartTime: Date
+  taskStartTime: Date,
+  currentDate: Date
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
-  // Ensure we don't start before the task's start time
-  let currentTime = new Date(Math.max(startTime.getTime(), taskStartTime.getTime()));
+  // Calculate the time offset from the original start time to maintain the same time of day
+  const timeOfDay = taskStartTime.getHours() * 60 + taskStartTime.getMinutes();
+  const currentTimeOfDay = currentDate.getHours() * 60 + currentDate.getMinutes();
+  
+  // Set the current time to respect the original task's time of day
+  let currentTime = new Date(currentDate);
+  currentTime.setHours(taskStartTime.getHours(), taskStartTime.getMinutes(), 0, 0);
+  
+  // Ensure we don't start before the task's start time for the first occurrence
+  if (currentDate.toDateString() === taskStartTime.toDateString()) {
+    currentTime = new Date(Math.max(startTime.getTime(), taskStartTime.getTime()));
+  }
+  
   let remainingDuration = duration;
 
   // Sort existing segments by start time
@@ -140,7 +152,8 @@ export async function rescheduleAllTasks() {
           dayEnd,
           existingTimeSlots,
           task.duration_minutes,
-          startDate // Pass the task's start time
+          startDate,
+          currentDate
         );
 
         for (const slot of availableSlots) {
