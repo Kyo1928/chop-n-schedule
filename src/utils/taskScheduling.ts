@@ -1,9 +1,70 @@
 import { Database } from "@/integrations/supabase/types";
-import { addDays, addWeeks } from "date-fns";
+import { addDays, addWeeks, isWithinInterval } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
+
+interface TimeSlot {
+  start: Date;
+  end: Date;
+  duration: number;
+}
+
+function findAvailableSlots(
+  startTime: Date,
+  endTime: Date,
+  existingSegments: TimeSlot[],
+  duration: number
+): TimeSlot[] {
+  const slots: TimeSlot[] = [];
+  let currentTime = new Date(startTime);
+
+  while (currentTime < endTime && duration > 0) {
+    // Find the next segment that starts after currentTime
+    const nextSegment = existingSegments.find(seg => 
+      seg.start > currentTime && isWithinInterval(seg.start, { start: currentTime, end: endTime })
+    );
+
+    if (!nextSegment) {
+      // No more segments, we can use the remaining time
+      const availableDuration = Math.min(
+        duration,
+        (endTime.getTime() - currentTime.getTime()) / (1000 * 60)
+      );
+      
+      if (availableDuration > 0) {
+        const slotEnd = new Date(currentTime.getTime() + availableDuration * 60 * 1000);
+        slots.push({
+          start: new Date(currentTime),
+          end: slotEnd,
+          duration: availableDuration
+        });
+      }
+      break;
+    }
+
+    // Calculate available duration before next segment
+    const availableDuration = Math.min(
+      duration,
+      (nextSegment.start.getTime() - currentTime.getTime()) / (1000 * 60)
+    );
+
+    if (availableDuration > 0) {
+      const slotEnd = new Date(currentTime.getTime() + availableDuration * 60 * 1000);
+      slots.push({
+        start: new Date(currentTime),
+        end: slotEnd,
+        duration: availableDuration
+      });
+      duration -= availableDuration;
+    }
+
+    currentTime = new Date(nextSegment.end);
+  }
+
+  return slots;
+}
 
 export async function rescheduleAllTasks() {
   try {
@@ -32,6 +93,7 @@ export async function rescheduleAllTasks() {
     console.log('Creating new segments...');
     const newSegments = [];
     const twoWeeksFromNow = addWeeks(new Date(), 2);
+    const existingTimeSlots: TimeSlot[] = [];
     
     for (const task of tasks) {
       const startDate = new Date(task.start_time);
@@ -58,15 +120,32 @@ export async function rescheduleAllTasks() {
       let currentDate = startDate;
       
       while (currentDate <= endDate) {
-        const segmentStartTime = new Date(currentDate);
-        const segmentDeadline = new Date(task.deadline);
+        const dayStart = new Date(currentDate);
+        dayStart.setHours(9, 0, 0, 0); // Start at 9 AM
         
-        newSegments.push({
-          task_id: task.id,
-          start_time: segmentStartTime.toISOString(),
-          duration_minutes: task.duration_minutes,
-          status: (segmentDeadline < new Date() ? 'missed_deadline' : 'on_time') as TaskStatus
-        });
+        const dayEnd = new Date(currentDate);
+        dayEnd.setHours(17, 0, 0, 0); // End at 5 PM
+        
+        // Find available slots for this day
+        const availableSlots = findAvailableSlots(
+          dayStart,
+          dayEnd,
+          existingTimeSlots,
+          task.duration_minutes
+        );
+
+        // Create segments for available slots
+        for (const slot of availableSlots) {
+          const segment = {
+            task_id: task.id,
+            start_time: slot.start.toISOString(),
+            duration_minutes: slot.duration,
+            status: (new Date(task.deadline) < new Date() ? 'missed_deadline' : 'on_time') as TaskStatus
+          };
+          
+          newSegments.push(segment);
+          existingTimeSlots.push(slot);
+        }
         
         // Calculate next occurrence based on repetition type
         switch (task.repetition_type) {

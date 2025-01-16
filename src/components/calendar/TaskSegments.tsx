@@ -92,7 +92,7 @@ export const TaskSegments = ({ segments, day, timeSlotHeight }: TaskSegmentsProp
                 )}
                 <Badge 
                   variant={segment.status === "missed_deadline" ? "destructive" : "secondary"}
-                  className="border-primary-foreground text-primary-foreground"
+                  className="border-primary-foreground text-primary-foreground dark:text-white"
                 >
                   {segment.status === "missed_deadline" ? "Misses Deadline!" : "On Time"}
                 </Badge>
