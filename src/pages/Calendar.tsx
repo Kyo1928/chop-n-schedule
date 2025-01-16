@@ -1,6 +1,7 @@
 import { useEffect, useState, CSSProperties, useRef } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ZoomIn, ZoomOut, CalendarDays, RefreshCw } from "lucide-react";
