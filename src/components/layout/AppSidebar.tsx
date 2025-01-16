@@ -15,6 +15,7 @@ import {
   SidebarTrigger,
   SidebarHeader,
   useSidebar,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 
@@ -46,14 +47,11 @@ export function AppSidebar() {
           className="fixed left-4 top-4 z-40 md:hidden"
           onClick={() => setOpenMobile(true)}
         >
-        <Menu className="h-5 w-5" />
-        <span className="sr-only">Toggle Menu</span>
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Toggle Menu</span>
         </Button>
       )}
-      <Sidebar 
-        collapsible="icon" 
-        className="w-[15vw]"
-      >
+      <Sidebar collapsible="icon" className="w-[15vw]">
         <SidebarHeader>
           <div className="flex items-center justify-between">
             <SidebarTrigger />
@@ -80,6 +78,16 @@ export function AppSidebar() {
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          
+          <SidebarSeparator />
+          
+          <SidebarGroup>
+            <SidebarGroupLabel>Settings</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                     {theme === "dark" ? <Sun /> : <Moon />}

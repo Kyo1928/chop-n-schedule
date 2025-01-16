@@ -15,10 +15,12 @@ function findAvailableSlots(
   startTime: Date,
   endTime: Date,
   existingSegments: TimeSlot[],
-  duration: number
+  duration: number,
+  taskStartTime: Date
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
-  let currentTime = new Date(startTime);
+  // Ensure we don't start before the task's start time
+  let currentTime = new Date(Math.max(startTime.getTime(), taskStartTime.getTime()));
   let remainingDuration = duration;
 
   // Sort existing segments by start time
@@ -27,14 +29,12 @@ function findAvailableSlots(
   );
 
   while (currentTime < endTime && remainingDuration > 0) {
-    // Find the next overlapping or subsequent segment
     const nextSegment = sortedSegments.find(seg => 
       seg.start.getTime() >= currentTime.getTime() &&
       seg.start.getTime() <= endTime.getTime()
     );
 
     if (!nextSegment) {
-      // No more segments, use remaining time until end of day
       const availableDuration = Math.min(
         remainingDuration,
         (endTime.getTime() - currentTime.getTime()) / (1000 * 60)
@@ -52,7 +52,6 @@ function findAvailableSlots(
       break;
     }
 
-    // Check if there's time before the next segment
     const timeUntilNext = (nextSegment.start.getTime() - currentTime.getTime()) / (1000 * 60);
     
     if (timeUntilNext > 0) {
@@ -68,7 +67,6 @@ function findAvailableSlots(
       remainingDuration -= availableDuration;
     }
 
-    // Move current time to after the next segment
     currentTime = new Date(nextSegment.end);
   }
 
@@ -104,7 +102,6 @@ export async function rescheduleAllTasks() {
     const twoWeeksFromNow = addWeeks(new Date(), 2);
     const existingTimeSlots: TimeSlot[] = [];
     
-    // Sort tasks by deadline to prioritize tasks with earlier deadlines
     const sortedTasks = [...tasks].sort((a, b) => 
       new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
     );
@@ -133,16 +130,17 @@ export async function rescheduleAllTasks() {
       
       while (currentDate <= endDate) {
         const dayStart = new Date(currentDate);
-        dayStart.setHours(9, 0, 0, 0); // Start at 9 AM
+        dayStart.setHours(9, 0, 0, 0);
         
         const dayEnd = new Date(currentDate);
-        dayEnd.setHours(17, 0, 0, 0); // End at 5 PM
+        dayEnd.setHours(17, 0, 0, 0);
         
         const availableSlots = findAvailableSlots(
           dayStart,
           dayEnd,
           existingTimeSlots,
-          task.duration_minutes
+          task.duration_minutes,
+          startDate // Pass the task's start time
         );
 
         for (const slot of availableSlots) {
