@@ -43,6 +43,12 @@ export const TaskSegments = ({ segments, day, timeSlotHeight }: TaskSegmentsProp
     };
   };
 
+  const getEndTime = (startTime: Date, durationMinutes: number) => {
+    const endTime = new Date(startTime);
+    endTime.setMinutes(endTime.getMinutes() + durationMinutes);
+    return endTime;
+  };
+
   return (
     <>
       {segments
@@ -84,9 +90,21 @@ export const TaskSegments = ({ segments, day, timeSlotHeight }: TaskSegmentsProp
                     {segment.task.description}
                   </p>
                 )}
+                <Badge 
+                  variant={segment.status === "missed_deadline" ? "destructive" : "secondary"}
+                  className="border-primary-foreground text-primary-foreground"
+                >
+                  {segment.status === "missed_deadline" ? "Misses Deadline!" : "On Time"}
+                </Badge>
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="h-4 w-4" />
                   <span>Duration: {formatDuration(segment.duration)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <CalendarIcon className="h-4 w-4" />
+                  <span>
+                    Scheduled: {format(segment.startTime, "MMM d, yyyy HH:mm")} - {format(getEndTime(segment.startTime, segment.duration), "HH:mm")}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <CalendarIcon className="h-4 w-4" />
