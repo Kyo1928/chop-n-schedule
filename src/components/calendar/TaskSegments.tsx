@@ -59,7 +59,7 @@ export const TaskSegments = ({ segments, day, timeSlotHeight }: TaskSegmentsProp
           <HoverCard key={`${segment.taskId}-${segmentIndex}`}>
             <HoverCardTrigger asChild>
               <div
-                className="absolute w-[calc(100%-8px)] mx-1 rounded-md p-2 text-primary-foreground overflow-hidden transition-all duration-200 cursor-pointer"
+                className="absolute w-[calc(100%-8px)] mx-1 rounded-md p-2 text-primary-foreground overflow-hidden transition-all duration-200 cursor-pointer border border-border/50"
                 style={getSegmentStyle(segment)}
               >
                 <div className="text-sm font-medium truncate">

@@ -19,17 +19,24 @@ function findAvailableSlots(
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
   let currentTime = new Date(startTime);
+  let remainingDuration = duration;
 
-  while (currentTime < endTime && duration > 0) {
-    // Find the next segment that starts after currentTime
-    const nextSegment = existingSegments.find(seg => 
-      seg.start > currentTime && isWithinInterval(seg.start, { start: currentTime, end: endTime })
+  // Sort existing segments by start time
+  const sortedSegments = [...existingSegments].sort((a, b) => 
+    a.start.getTime() - b.start.getTime()
+  );
+
+  while (currentTime < endTime && remainingDuration > 0) {
+    // Find the next overlapping or subsequent segment
+    const nextSegment = sortedSegments.find(seg => 
+      seg.start.getTime() >= currentTime.getTime() &&
+      seg.start.getTime() <= endTime.getTime()
     );
 
     if (!nextSegment) {
-      // No more segments, we can use the remaining time
+      // No more segments, use remaining time until end of day
       const availableDuration = Math.min(
-        duration,
+        remainingDuration,
         (endTime.getTime() - currentTime.getTime()) / (1000 * 60)
       );
       
@@ -40,26 +47,28 @@ function findAvailableSlots(
           end: slotEnd,
           duration: availableDuration
         });
+        remainingDuration -= availableDuration;
       }
       break;
     }
 
-    // Calculate available duration before next segment
-    const availableDuration = Math.min(
-      duration,
-      (nextSegment.start.getTime() - currentTime.getTime()) / (1000 * 60)
-    );
-
-    if (availableDuration > 0) {
+    // Check if there's time before the next segment
+    const timeUntilNext = (nextSegment.start.getTime() - currentTime.getTime()) / (1000 * 60);
+    
+    if (timeUntilNext > 0) {
+      const availableDuration = Math.min(remainingDuration, timeUntilNext);
       const slotEnd = new Date(currentTime.getTime() + availableDuration * 60 * 1000);
+      
       slots.push({
         start: new Date(currentTime),
         end: slotEnd,
         duration: availableDuration
       });
-      duration -= availableDuration;
+      
+      remainingDuration -= availableDuration;
     }
 
+    // Move current time to after the next segment
     currentTime = new Date(nextSegment.end);
   }
 
@@ -95,15 +104,18 @@ export async function rescheduleAllTasks() {
     const twoWeeksFromNow = addWeeks(new Date(), 2);
     const existingTimeSlots: TimeSlot[] = [];
     
-    for (const task of tasks) {
+    // Sort tasks by deadline to prioritize tasks with earlier deadlines
+    const sortedTasks = [...tasks].sort((a, b) => 
+      new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+    );
+    
+    for (const task of sortedTasks) {
       const startDate = new Date(task.start_time);
       let endDate: Date;
       
-      // For repeating tasks, set end date to 2 weeks from now
       if (task.repetition_type && task.repetition_type !== 'none') {
         endDate = twoWeeksFromNow;
         
-        // Update the task's repetition_end_date in the database
         const { error: updateError } = await supabase
           .from('tasks')
           .update({ repetition_end_date: endDate.toISOString() })
@@ -126,7 +138,6 @@ export async function rescheduleAllTasks() {
         const dayEnd = new Date(currentDate);
         dayEnd.setHours(17, 0, 0, 0); // End at 5 PM
         
-        // Find available slots for this day
         const availableSlots = findAvailableSlots(
           dayStart,
           dayEnd,
@@ -134,7 +145,6 @@ export async function rescheduleAllTasks() {
           task.duration_minutes
         );
 
-        // Create segments for available slots
         for (const slot of availableSlots) {
           const segment = {
             task_id: task.id,
@@ -147,7 +157,6 @@ export async function rescheduleAllTasks() {
           existingTimeSlots.push(slot);
         }
         
-        // Calculate next occurrence based on repetition type
         switch (task.repetition_type) {
           case 'daily':
             currentDate = addDays(currentDate, 1);
@@ -162,7 +171,6 @@ export async function rescheduleAllTasks() {
             currentDate.setFullYear(currentDate.getFullYear() + 1);
             break;
           default:
-            // For non-repeating tasks, exit the loop after one iteration
             currentDate = new Date(endDate.getTime() + 1);
         }
       }
