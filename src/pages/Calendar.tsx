@@ -1,7 +1,7 @@
 import { useEffect, useState, CSSProperties, useRef } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday, addDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ZoomIn, ZoomOut, CalendarDays, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { useCalendarScroll } from "@/hooks/use-calendar-scroll";
 import { TimeColumn } from "@/components/calendar/TimeColumn";
 import { TaskSegments } from "@/components/calendar/TaskSegments";
 import { useToast } from "@/hooks/use-toast";
-import { Database } from "@/integrations/supabase/types";
+import { rescheduleAllTasks } from "@/utils/taskScheduling";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
 
@@ -80,84 +80,7 @@ export default function CalendarPage() {
     
     setIsRescheduling(true);
     try {
-      console.log('Deleting existing segments...');
-      const { error: deleteError } = await supabase
-        .from('scheduled_segments')
-        .delete()
-        .not('id', 'is', null);
-
-      if (deleteError) {
-        console.error('Error deleting segments:', deleteError);
-        throw deleteError;
-      }
-
-      console.log('Fetching tasks...');
-      const { data: tasks, error: tasksError } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('deadline', { ascending: true });
-
-      if (tasksError) {
-        console.error('Error fetching tasks:', tasksError);
-        throw tasksError;
-      }
-
-      console.log('Creating new segments...');
-      const newSegments = [];
-      
-      for (const task of tasks) {
-        const startDate = new Date(task.start_time);
-        const endDate = task.repetition_end_date 
-          ? new Date(task.repetition_end_date)
-          : new Date(task.deadline);
-        
-        let currentDate = startDate;
-        
-        while (currentDate <= endDate) {
-          const segmentStartTime = new Date(currentDate);
-          const segmentDeadline = new Date(task.deadline);
-          
-          newSegments.push({
-            task_id: task.id,
-            start_time: segmentStartTime.toISOString(),
-            duration_minutes: task.duration_minutes,
-            status: (segmentDeadline < new Date() ? 'missed_deadline' : 'on_time') as TaskStatus
-          });
-          
-          // Calculate next occurrence based on repetition type
-          switch (task.repetition_type) {
-            case 'daily':
-              currentDate = addDays(currentDate, 1);
-              break;
-            case 'weekly':
-              currentDate = addDays(currentDate, 7);
-              break;
-            case 'monthly':
-              currentDate.setMonth(currentDate.getMonth() + 1);
-              break;
-            case 'yearly':
-              currentDate.setFullYear(currentDate.getFullYear() + 1);
-              break;
-            default:
-              // For non-repeating tasks, exit the loop after one iteration
-              currentDate = new Date(endDate.getTime() + 1);
-          }
-        }
-      }
-
-      if (newSegments.length > 0) {
-        console.log('Inserting segments:', newSegments);
-        const { error: insertError } = await supabase
-          .from('scheduled_segments')
-          .insert(newSegments);
-
-        if (insertError) {
-          console.error('Error inserting segments:', insertError);
-          throw insertError;
-        }
-      }
-
-      // Refresh the segments display
+      await rescheduleAllTasks();
       await fetchScheduledSegments();
       
       toast({
@@ -201,14 +124,12 @@ export default function CalendarPage() {
     const visibleDays = getVisibleDays();
     const dayWidth = isMobile ? DAY_WIDTH_MOBILE : DAY_WIDTH;
 
-    // Calculate the current day index we're looking at
     const leftmostVisibleIndex = Math.floor(scrollPosition / dayWidth);
     if (leftmostVisibleIndex >= 0 && leftmostVisibleIndex < visibleDays.length) {
       const leftmostVisibleDay = visibleDays[leftmostVisibleIndex];
       setCurrentYear(format(leftmostVisibleDay, 'yyyy'));
     }
 
-    // If we're near the end, load next month and remove first month
     if (scrollPosition > totalWidth - viewportWidth - 1000) {
       setVisibleMonths(prev => {
         const nextMonth = addMonths(prev[prev.length - 1], 1);
@@ -217,7 +138,6 @@ export default function CalendarPage() {
           end: endOfMonth(prev[0])
         }).length;
 
-        // Adjust scroll position after state update
         setTimeout(() => {
           if (viewport) {
             viewport.scrollLeft = scrollPosition - (daysInFirstMonth * dayWidth);
@@ -226,9 +146,7 @@ export default function CalendarPage() {
 
         return [...prev.slice(1), nextMonth];
       });
-    }
-    // If we're near the start, load previous month and remove last month
-    else if (scrollPosition < 1000) {
+    } else if (scrollPosition < 1000) {
       setVisibleMonths(prev => {
         const prevMonth = subMonths(prev[0], 1);
         const daysInNewMonth = eachDayOfInterval({
@@ -236,7 +154,6 @@ export default function CalendarPage() {
           end: endOfMonth(prevMonth)
         }).length;
 
-        // Adjust scroll position after state update
         setTimeout(() => {
           if (viewport) {
             viewport.scrollLeft = scrollPosition + (daysInNewMonth * dayWidth);
@@ -265,7 +182,6 @@ export default function CalendarPage() {
       addMonths(today, 1)
     ]);
     
-    // Scroll to today's column after a short delay to ensure the DOM has updated
     setTimeout(() => {
       const todayColumn = document.querySelector('[data-is-today="true"]');
       if (todayColumn) {
@@ -275,7 +191,6 @@ export default function CalendarPage() {
     handleScroll();
   };
 
-  // Initialize visible months on mount
   useEffect(() => {
     setVisibleMonths([
       subMonths(centerMonth, 1),
