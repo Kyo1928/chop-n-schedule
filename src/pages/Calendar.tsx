@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ZoomIn, ZoomOut, CalendarDays, RefreshCw } from "lucide-react";
+import { ZoomIn, ZoomOut, CalendarDays, RefreshCw, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCalendarScroll } from "@/hooks/use-calendar-scroll";
@@ -12,6 +12,13 @@ import { TimeColumn } from "@/components/calendar/TimeColumn";
 import { TaskSegments } from "@/components/calendar/TaskSegments";
 import { useToast } from "@/hooks/use-toast";
 import { rescheduleAllTasks } from "@/utils/taskScheduling";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
 
@@ -208,6 +215,90 @@ export default function CalendarPage() {
     }, 100);
   }, []);
 
+  const renderControls = () => {
+    if (isMobile) {
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon">
+              <MoreVertical className="h-4 w-4" />
+              <span className="sr-only">Open calendar controls</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={goToToday}>
+                <CalendarDays className="mr-2 h-4 w-4" />
+                <span>Go to Today</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleReschedule}
+                disabled={isRescheduling}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${isRescheduling ? 'animate-spin' : ''}`} />
+                <span>Reschedule Tasks</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleZoomOut}
+                disabled={timeSlotHeight <= MIN_TIME_SLOT_HEIGHT}
+              >
+                <ZoomOut className="mr-2 h-4 w-4" />
+                <span>Zoom Out</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleZoomIn}
+                disabled={timeSlotHeight >= MAX_TIME_SLOT_HEIGHT}
+              >
+                <ZoomIn className="mr-2 h-4 w-4" />
+                <span>Zoom In</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+
+    return (
+      <>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={goToToday}
+          className="hidden md:flex"
+        >
+          <CalendarDays className="mr-2 h-4 w-4" />
+          Today
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleReschedule}
+          disabled={isRescheduling}
+          className="hidden md:flex"
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isRescheduling ? 'animate-spin' : ''}`} />
+          Reschedule Tasks
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleZoomOut}
+          disabled={timeSlotHeight <= MIN_TIME_SLOT_HEIGHT}
+        >
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleZoomIn}
+          disabled={timeSlotHeight >= MAX_TIME_SLOT_HEIGHT}
+        >
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+      </>
+    );
+  };
+
   return (
     <div className="w-full px-2 md:px-8 pt-12 md:pt-6">
       <div className="flex items-center justify-between mb-6">
@@ -216,43 +307,9 @@ export default function CalendarPage() {
             <h1 className="text-2xl font-bold">Calendar Schedule</h1>
             <span className="text-lg text-muted-foreground">{currentYear}</span>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={goToToday}
-            className="hidden md:flex"
-          >
-            <CalendarDays className="mr-2 h-4 w-4" />
-            Today
-          </Button>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleReschedule}
-            disabled={isRescheduling}
-            className="hidden md:flex"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isRescheduling ? 'animate-spin' : ''}`} />
-            Reschedule Tasks
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleZoomOut}
-            disabled={timeSlotHeight <= MIN_TIME_SLOT_HEIGHT}
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleZoomIn}
-            disabled={timeSlotHeight >= MAX_TIME_SLOT_HEIGHT}
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
+          {renderControls()}
         </div>
       </div>
       <div className="rounded-md border">
