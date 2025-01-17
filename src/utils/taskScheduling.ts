@@ -1,5 +1,5 @@
 import { Database } from "@/integrations/supabase/types";
-import { addDays, addWeeks, isWithinInterval } from "date-fns";
+import { addDays, addWeeks, differenceInMinutes, addMinutes } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
@@ -8,30 +8,27 @@ type Task = Database["public"]["Tables"]["tasks"]["Row"];
 interface TimeSlot {
   start: Date;
   end: Date;
-  duration: number;
+  status: TaskStatus;
 }
 
+let weeksToReschedule = 6;
+const millisecondsInMinute = 60 * 1000;
+
 function findAvailableSlots(
-  startTime: Date,
-  endTime: Date,
   existingSegments: TimeSlot[],
   duration: number,
-  taskStartTime: Date,
-  currentDate: Date
+  taskOriginalStartTime: Date,
+  taskOriginalDeadline: Date,
+  currentDateToStartFrom: Date,
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
-  // Calculate the time offset from the original start time to maintain the same time of day
-  const timeOfDay = taskStartTime.getHours() * 60 + taskStartTime.getMinutes();
-  const currentTimeOfDay = currentDate.getHours() * 60 + currentDate.getMinutes();
-  
   // Set the current time to respect the original task's time of day
-  let currentTime = new Date(currentDate);
-  currentTime.setHours(taskStartTime.getHours(), taskStartTime.getMinutes(), 0, 0);
-  
-  // Ensure we don't start before the task's start time for the first occurrence
-  if (currentDate.toDateString() === taskStartTime.toDateString()) {
-    currentTime = new Date(Math.max(startTime.getTime(), taskStartTime.getTime()));
-  }
+  let currentStartTime = new Date(currentDateToStartFrom);
+  currentStartTime.setHours(taskOriginalStartTime.getHours(), taskOriginalStartTime.getMinutes(), 0, 0);
+
+  let deadlineDifference = differenceInMinutes(taskOriginalDeadline, taskOriginalStartTime);
+  let currentDeadline = new Date(currentStartTime);
+  currentDeadline = addMinutes(currentDeadline, deadlineDifference);
   
   let remainingDuration = duration;
 
@@ -40,40 +37,36 @@ function findAvailableSlots(
     a.start.getTime() - b.start.getTime()
   );
 
-  while (currentTime < endTime && remainingDuration > 0) {
+  let currentTime = new Date(currentStartTime);
+  while (remainingDuration > 0) {
     const nextSegment = sortedSegments.find(seg => 
-      seg.start.getTime() >= currentTime.getTime() &&
-      seg.start.getTime() <= endTime.getTime()
+      seg.start.getTime() >= currentTime.getTime() ||
+      (seg.start.getTime() < currentTime.getTime() && seg.end.getTime() > currentTime.getTime())
     );
 
     if (!nextSegment) {
-      const availableDuration = Math.min(
-        remainingDuration,
-        (endTime.getTime() - currentTime.getTime()) / (1000 * 60)
-      );
-      
-      if (availableDuration > 0) {
-        const slotEnd = new Date(currentTime.getTime() + availableDuration * 60 * 1000);
-        slots.push({
-          start: new Date(currentTime),
-          end: slotEnd,
-          duration: availableDuration
-        });
-        remainingDuration -= availableDuration;
-      }
-      break;
-    }
-
-    const timeUntilNext = (nextSegment.start.getTime() - currentTime.getTime()) / (1000 * 60);
-    
-    if (timeUntilNext > 0) {
-      const availableDuration = Math.min(remainingDuration, timeUntilNext);
-      const slotEnd = new Date(currentTime.getTime() + availableDuration * 60 * 1000);
-      
+      const slotEnd = addMinutes(currentTime, remainingDuration);
       slots.push({
         start: new Date(currentTime),
         end: slotEnd,
-        duration: availableDuration
+        status: slotEnd > currentDeadline ? 'missed_deadline' : 'on_time'
+      });
+      remainingDuration = 0
+      break;
+    } else if (nextSegment.start.getTime() < currentTime.getTime()) {
+      currentTime = new Date(nextSegment.start);
+      continue;
+    }
+
+    const timeUntilNext = (nextSegment.start.getTime() - currentTime.getTime()) / millisecondsInMinute;
+    
+    if (timeUntilNext > 0) {
+      const availableDuration = Math.min(remainingDuration, timeUntilNext);
+      const slotEnd = addMinutes(currentTime, availableDuration);      
+      slots.push({
+        start: new Date(currentTime),
+        end: slotEnd,
+        status: slotEnd > currentDeadline ? 'missed_deadline' : 'on_time'
       });
       
       remainingDuration -= availableDuration;
@@ -85,33 +78,43 @@ function findAvailableSlots(
   return slots;
 }
 
+async function deleteExistingSegments() {
+  console.log('Deleting existing segments...');
+  const { error: deleteError } = await supabase
+    .from('scheduled_segments')
+    .delete()
+    .not('id', 'is', null);
+
+  if (deleteError) {
+    console.error('Error deleting segments:', deleteError);
+    throw deleteError;
+  }
+}
+
+async function fetchTasks() {
+  console.log('Fetching tasks...');
+  const { data: tasks, error: tasksError } = await supabase
+    .from('tasks')
+    .select('*')
+    .order('deadline', { ascending: true });
+
+  if (tasksError) {
+    console.error('Error fetching tasks:', tasksError);
+    throw tasksError;
+  }
+
+  return tasks;
+}
+
 export async function rescheduleAllTasks() {
   try {
-    console.log('Deleting existing segments...');
-    const { error: deleteError } = await supabase
-      .from('scheduled_segments')
-      .delete()
-      .not('id', 'is', null);
+    await deleteExistingSegments();
 
-    if (deleteError) {
-      console.error('Error deleting segments:', deleteError);
-      throw deleteError;
-    }
-
-    console.log('Fetching tasks...');
-    const { data: tasks, error: tasksError } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('deadline', { ascending: true });
-
-    if (tasksError) {
-      console.error('Error fetching tasks:', tasksError);
-      throw tasksError;
-    }
+    const tasks = await fetchTasks();
 
     console.log('Creating new segments...');
     const newSegments = [];
-    const twoWeeksFromNow = addWeeks(new Date(), 2);
+    const weeksFromNow = addWeeks(new Date(), weeksToReschedule);
     const existingTimeSlots: TimeSlot[] = [];
     
     const sortedTasks = [...tasks].sort((a, b) => 
@@ -121,9 +124,10 @@ export async function rescheduleAllTasks() {
     for (const task of sortedTasks) {
       const startDate = new Date(task.start_time);
       let endDate: Date;
-      
+     
+      // Set the end date to the repetition end date if the task has a repetition type
       if (task.repetition_type && task.repetition_type !== 'none') {
-        endDate = twoWeeksFromNow;
+        endDate = weeksFromNow;
         
         const { error: updateError } = await supabase
           .from('tasks')
@@ -139,20 +143,12 @@ export async function rescheduleAllTasks() {
       }
       
       let currentDate = startDate;
-      
       while (currentDate <= endDate) {
-        const dayStart = new Date(currentDate);
-        dayStart.setHours(9, 0, 0, 0);
-        
-        const dayEnd = new Date(currentDate);
-        dayEnd.setHours(17, 0, 0, 0);
-        
         const availableSlots = findAvailableSlots(
-          dayStart,
-          dayEnd,
           existingTimeSlots,
           task.duration_minutes,
           startDate,
+          new Date(task.deadline),
           currentDate
         );
 
@@ -160,8 +156,8 @@ export async function rescheduleAllTasks() {
           const segment = {
             task_id: task.id,
             start_time: slot.start.toISOString(),
-            duration_minutes: slot.duration,
-            status: (new Date(task.deadline) < new Date() ? 'missed_deadline' : 'on_time') as TaskStatus
+            duration_minutes: differenceInMinutes(slot.end, slot.start),
+            status: slot.status
           };
           
           newSegments.push(segment);
